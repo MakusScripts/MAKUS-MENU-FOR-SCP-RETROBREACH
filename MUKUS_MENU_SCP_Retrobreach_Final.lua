@@ -1,4 +1,4 @@
---// MUKUS MENU
+
 --// SCP retroBreach - LocalScript -> StarterPlayer -> StarterPlayerScripts
 --// UI / client utility panel for Studio testing
 
@@ -47,11 +47,11 @@ end
 --==================================================
 
 local Colors = {
-    Background = Color3.fromRGB(10, 11, 13),
-    Panel = Color3.fromRGB(18, 19, 22),
-    Panel2 = Color3.fromRGB(24, 25, 29),
-    Button = Color3.fromRGB(31, 32, 37),
-    ButtonHover = Color3.fromRGB(43, 44, 50),
+    Background = Color3.fromRGB(7, 8, 11),
+    Panel = Color3.fromRGB(15, 16, 21),
+    Panel2 = Color3.fromRGB(21, 22, 29),
+    Button = Color3.fromRGB(25, 27, 35),
+    ButtonHover = Color3.fromRGB(39, 41, 52),
     SCPBlack = Color3.fromRGB(5, 6, 7),
     Red = Color3.fromRGB(185, 28, 34),
     RedBright = Color3.fromRGB(225, 45, 55),
@@ -94,30 +94,23 @@ local Lang = {
         speedValue = "WalkSpeed",
         speedHint = "Enter value: 1 - 250",
         set = "SET",
-        commandPlaceholder = "help / noclip on / speed 32 / tp 173",
+        commandPlaceholder = "help / noclip on / speed 32 / tp 914",
         execute = "EXEC",
         teleTitle = "QUICK LOCATIONS",
-        tp173 = "SCP-173",
-        tp049 = "SCP-049",
-        tp106 = "SCP-106",
         tp914 = "SCP-914",
-        tpClassD = "CLASS-D CELLS",
         tpGateA = "GATE A",
+        tpMedkit = "MEDKITS",
         tpArmory = "ARMORY",
-        tpGateB = "GATE B",
-        tpLCZ = "LCZ",
-        tpHCZ = "HCZ",
-        tpEZ = "EZ",
         hidden = "Location not found in this server",
         menuHint = "F4 • Drag panel • Right mouse = aim",
         unknown = "UNKNOWN COMMAND • TYPE help",
-        help = "help | status | noclip on/off | esp on/off | aim on/off | speed on/off | speed 32 | fov 80 | fullbright on/off | crosshair on/off | tp 914/classd/gatea/armory | reset | rejoin",
+        help = "help | status | noclip on/off | esp on/off | aim on/off | speed on/off | speed 32 | fov 80 | fullbright on/off | crosshair on/off | tp 914/gatea/armory/medkit | reset | rejoin",
         reset = "RESET EXECUTED",
         rejoin = "REJOINING...",
         fovUsage = "USAGE: fov 40-120",
         fovSet = "FOV SET: ",
         speedSet = "SPEED SET: ",
-        tpUsage = "USAGE: tp 914 / classd / gatea / armory",
+        tpUsage = "USAGE: tp 914 / gatea / armory / medkit",
         tpOk = "TELEPORTED: ",
         tpFail = "TARGET NOT FOUND: ",
         status = "NC:%s ESP:%s AIM:%s SPD:%s FB:%s"
@@ -149,30 +142,23 @@ local Lang = {
         speedValue = "Скорость ходьбы",
         speedHint = "Введите значение: 1 - 250",
         set = "УСТАН.",
-        commandPlaceholder = "помощь / ноклип вкл / скорость 32 / тп 173",
+        commandPlaceholder = "помощь / ноклип вкл / скорость 32 / тп 914",
         execute = "ВЫП",
         teleTitle = "БЫСТРЫЕ ТОЧКИ",
-        tp173 = "SCP-173",
-        tp049 = "SCP-049",
-        tp106 = "SCP-106",
         tp914 = "SCP-914",
-        tpClassD = "КАМЕРЫ CLASS-D",
         tpGateA = "ВОРОТА A",
+        tpMedkit = "АПТЕЧКИ",
         tpArmory = "ОРУЖЕЙНАЯ",
-        tpGateB = "ВОРОТА B",
-        tpLCZ = "LCZ",
-        tpHCZ = "HCZ",
-        tpEZ = "EZ",
         hidden = "Точка не найдена на этом сервере",
         menuHint = "F4 • Перетаскивание • ПКМ = аим",
         unknown = "НЕИЗВЕСТНАЯ КОМАНДА • ВВЕДИТЕ помощь",
-        help = "помощь | статус | ноклип вкл/выкл | есп вкл/выкл | аим вкл/выкл | скорость вкл/выкл | скорость 32 | фов 80 | фуллбрайт вкл/выкл | прицел вкл/выкл | тп 914/классд/воротаа/оружейная | сброс | перезаход",
+        help = "помощь | статус | ноклип вкл/выкл | есп вкл/выкл | аим вкл/выкл | скорость вкл/выкл | скорость 32 | фов 80 | фуллбрайт вкл/выкл | прицел вкл/выкл | тп 914/воротаа/оружейная/аптечки | сброс | перезаход",
         reset = "СБРОС ВЫПОЛНЕН",
         rejoin = "ПЕРЕЗАХОД...",
         fovUsage = "ИСПОЛЬЗОВАНИЕ: фов 40-120",
         fovSet = "FOV УСТАНОВЛЕН: ",
         speedSet = "СКОРОСТЬ УСТАНОВЛЕНА: ",
-        tpUsage = "ИСПОЛЬЗОВАНИЕ: тп 914 / классд / воротаа / оружейная",
+        tpUsage = "ИСПОЛЬЗОВАНИЕ: тп 914 / воротаа / оружейная / аптечки",
         tpOk = "ТЕЛЕПОРТ: ",
         tpFail = "ТОЧКА НЕ НАЙДЕНА: ",
         status = "НОК:%s ESP:%s АИМ:%s СКР:%s FB:%s"
@@ -314,8 +300,8 @@ local EnglishButton = MakeLanguageButton("ENGLISH", UDim2.fromOffset(165, 125))
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.fromOffset(390, 620)
-Main.Position = UDim2.new(0, 35, 0.5, -310)
+Main.Size = UDim2.fromOffset(470, 680)
+Main.Position = UDim2.new(0, 30, 0.5, -340)
 Main.BackgroundColor3 = Colors.Background
 Main.BorderSizePixel = 0
 Main.Visible = false
@@ -335,6 +321,34 @@ Accent.Size = UDim2.new(0, 5, 1, 0)
 Accent.BackgroundColor3 = Colors.RedBright
 Accent.BorderSizePixel = 0
 Accent.Parent = TopBar
+
+local HeaderGradient = Instance.new("UIGradient")
+HeaderGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Colors.Red),
+    ColorSequenceKeypoint.new(0.55, Colors.Panel),
+    ColorSequenceKeypoint.new(1, Colors.Background)
+})
+HeaderGradient.Rotation = 0
+HeaderGradient.Parent = TopBar
+
+local StatusDot = Instance.new("Frame")
+StatusDot.Size = UDim2.fromOffset(8, 8)
+StatusDot.Position = UDim2.new(1, -78, 0, 22)
+StatusDot.BackgroundColor3 = Colors.Green
+StatusDot.BorderSizePixel = 0
+StatusDot.Parent = TopBar
+AddCorner(StatusDot, 99)
+
+local StatusText = Instance.new("TextLabel")
+StatusText.Position = UDim2.new(1, -185, 0, 17)
+StatusText.Size = UDim2.fromOffset(95, 18)
+StatusText.BackgroundTransparency = 1
+StatusText.Text = "ONLINE"
+StatusText.TextColor3 = Colors.Green
+StatusText.Font = Enum.Font.Code
+StatusText.TextSize = 9
+StatusText.TextXAlignment = Enum.TextXAlignment.Right
+StatusText.Parent = TopBar
 
 local Title = Instance.new("TextLabel")
 Title.Position = UDim2.fromOffset(22, 10)
@@ -376,6 +390,13 @@ TabBar.Position = UDim2.fromOffset(15, 75)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = Main
 
+local TabDivider = Instance.new("Frame")
+TabDivider.Size = UDim2.new(1, -30, 0, 1)
+TabDivider.Position = UDim2.fromOffset(15, 109)
+TabDivider.BackgroundColor3 = Color3.fromRGB(45, 46, 55)
+TabDivider.BorderSizePixel = 0
+TabDivider.Parent = Main
+
 local TabLayout = Instance.new("UIListLayout")
 TabLayout.FillDirection = Enum.FillDirection.Horizontal
 TabLayout.Padding = UDim.new(0, 5)
@@ -383,8 +404,8 @@ TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabLayout.Parent = TabBar
 
 local Content = Instance.new("ScrollingFrame")
-Content.Position = UDim2.fromOffset(15, 112)
-Content.Size = UDim2.new(1, -30, 1, -127)
+Content.Position = UDim2.fromOffset(15, 120)
+Content.Size = UDim2.new(1, -30, 1, -135)
 Content.BackgroundTransparency = 1
 Content.BorderSizePixel = 0
 Content.ScrollBarThickness = 3
@@ -416,7 +437,7 @@ end
 
 local function CreateTab(Text, TargetText)
     local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(0, 72, 1, 0)
+    Button.Size = UDim2.new(0, 84, 1, 0)
     Button.BackgroundColor3 = Colors.Button
     Button.BorderSizePixel = 0
     Button.AutoButtonColor = false
@@ -426,12 +447,16 @@ local function CreateTab(Text, TargetText)
     Button.TextSize = 9
     Button.Parent = TabBar
     AddCorner(Button, 8)
+    local TabStroke = AddStroke(Button, Colors.Red, 1, 0.75)
     Button.MouseEnter:Connect(function() Tween(Button, 0.1, {BackgroundColor3 = Colors.ButtonHover}) end)
     Button.MouseLeave:Connect(function() Tween(Button, 0.1, {BackgroundColor3 = Colors.Button}) end)
     Button.MouseButton1Click:Connect(function()
         local Section = SectionRefs[TargetText]
         if Section then
             Content.CanvasPosition = Vector2.new(0, math.max(0, Section.AbsolutePosition.Y - Content.AbsolutePosition.Y - 5))
+            TabStroke.Transparency = 0.15
+            Tween(Button, 0.12, {BackgroundColor3 = Colors.Red})
+            task.delay(0.22, function() if Button.Parent then Tween(Button, 0.18, {BackgroundColor3 = Colors.Button}) end end)
         end
     end)
     return Button
@@ -820,9 +845,9 @@ end
 
 local TeleportAliases = {
     ["914"] = {"SCP-914", "SCP914", "914", "room914", "914Room", "Refiner"},
-    ["classd"] = {"Class-D Cells", "ClassD", "Class-D", "Cells", "CellBlock", "ClassDCells", "Class D", "D-Class", "DClass"},
     ["gatea"] = {"Gate A", "GateA", "GATE_A", "gateaentrance", "Gate_A", "GateAEntrance"},
-    ["armory"] = {"Armory", "Armoury", "Light Armory", "LightArmory", "Light Armoury", "WeaponRoom", "Weapons", "GunRoom", "SecurityArmory"}
+    ["armory"] = {"Armory", "Armoury", "Light Armory", "LightArmory", "Light Armoury", "WeaponRoom", "Weapons", "GunRoom", "SecurityArmory"},
+    ["medkit"] = {"Medkit", "Medkits", "Med Kit", "Med Kits", "First Aid", "FirstAid", "Medical", "MedicalKit", "HealthKit", "Bandage", "Bandages", "Med"}
 }
 
 local function NormalizeName(Text)
@@ -833,12 +858,19 @@ local function FindTeleportTarget(Key)
     local Aliases = TeleportAliases[Key]
     if not Aliases then return nil end
 
-    -- Exact child matches first.
+    -- Exact matches first. Prefer a Model/Attachment so a decorative wall part
+    -- with the same name does not become the teleport anchor.
+    local ExactBaseParts = {}
     for _, Alias in ipairs(Aliases) do
         local Direct = workspace:FindFirstChild(Alias, true)
-        if Direct and (Direct:IsA("BasePart") or Direct:IsA("Model") or Direct:IsA("Attachment")) then
+        if Direct and (Direct:IsA("Model") or Direct:IsA("Attachment")) then
             return Direct
+        elseif Direct and Direct:IsA("BasePart") then
+            table.insert(ExactBaseParts, Direct)
         end
+    end
+    if #ExactBaseParts > 0 then
+        return ExactBaseParts[1]
     end
 
     -- Normalized fallback for names such as SCP_173 / SCP 173.
@@ -872,35 +904,68 @@ local function FindSafeTeleportCFrame(Target)
     local BasePosition = GetTargetPosition(Target)
     if not BasePosition then return nil end
 
-    -- Never drop the player inside a wall or below the map.
-    -- Search a small ring around the landmark and raycast downward for floor.
     local Character = LocalPlayer.Character
     local Ignore = {Character}
     local Params = RaycastParams.new()
     Params.FilterType = Enum.RaycastFilterType.Exclude
     Params.FilterDescendantsInstances = Ignore
 
-    local Offsets = {
-        Vector3.new(0, 8, 0), Vector3.new(5, 8, 0), Vector3.new(-5, 8, 0),
-        Vector3.new(0, 8, 5), Vector3.new(0, 8, -5), Vector3.new(7, 8, 7),
-        Vector3.new(-7, 8, 7), Vector3.new(7, 8, -7), Vector3.new(-7, 8, -7)
-    }
+    local Overlap = OverlapParams.new()
+    Overlap.FilterType = Enum.RaycastFilterType.Exclude
+    Overlap.FilterDescendantsInstances = Ignore
 
-    for _, Offset in ipairs(Offsets) do
+    -- Use a wider search grid around the landmark instead of its pivot.
+    -- This is important for SCP-914: its model pivot can be inside the machine/wall.
+    local CandidateOffsets = {}
+    for Radius = 4, 18, 2 do
+        for Step = 0, 15 do
+            local Angle = math.rad(Step * 22.5)
+            table.insert(CandidateOffsets, Vector3.new(math.cos(Angle) * Radius, 14, math.sin(Angle) * Radius))
+        end
+    end
+    table.insert(CandidateOffsets, Vector3.new(0, 14, 0))
+
+    local BestCFrame = nil
+    local BestScore = math.huge
+
+    for _, Offset in ipairs(CandidateOffsets) do
         local Probe = BasePosition + Offset
-        local Down = workspace:Raycast(Probe, Vector3.new(0, -30, 0), Params)
-        if Down and Down.Instance and Down.Position.Y > workspace.FallenPartsDestroyHeight + 20 then
-            local Floor = Down.Position + Vector3.new(0, 3.2, 0)
-            local Forward = (BasePosition - Floor)
-            Forward = Vector3.new(Forward.X, 0, Forward.Z)
-            if Forward.Magnitude < 0.1 then Forward = Vector3.new(0, 0, -1) end
-            Forward = Forward.Unit
-            return CFrame.lookAt(Floor, Floor + Forward)
+        local Down = workspace:Raycast(Probe, Vector3.new(0, -45, 0), Params)
+        if Down and Down.Instance and Down.Position.Y > workspace.FallenPartsDestroyHeight + 25 then
+            local Floor = Down.Position + Vector3.new(0, 3.4, 0)
+            local FlatToTarget = Vector3.new(BasePosition.X - Floor.X, 0, BasePosition.Z - Floor.Z)
+            local Facing = FlatToTarget.Magnitude > 0.25 and FlatToTarget.Unit or Vector3.new(0, 0, -1)
+
+            -- Check a player-sized volume for obvious wall/prop intersections.
+            local Blockers = workspace:GetPartBoundsInBox(CFrame.new(Floor), Vector3.new(4.5, 6, 4.5), Overlap)
+            local Blocked = false
+            for _, Part in ipairs(Blockers) do
+                if Part.CanCollide and Part.Transparency < 0.98 and not Part:IsDescendantOf(Target) then
+                    Blocked = true
+                    break
+                end
+            end
+
+            if not Blocked then
+                local Distance = (Vector3.new(Floor.X, 0, Floor.Z) - Vector3.new(BasePosition.X, 0, BasePosition.Z)).Magnitude
+                local Score = Distance
+                -- Prefer spots slightly away from the exact pivot and with a direct floor hit.
+                if Down.Instance:IsDescendantOf(Target) then Score += 8 end
+                if math.abs(Down.Normal.Y) < 0.75 then Score += 20 end
+                if Score < BestScore then
+                    BestScore = Score
+                    BestCFrame = CFrame.lookAt(Floor, Floor + Facing)
+                end
+            end
         end
     end
 
-    -- Fallback: landmark position, but keep a safe vertical offset.
-    return CFrame.new(BasePosition + Vector3.new(0, 5, 0))
+    if BestCFrame then
+        return BestCFrame
+    end
+
+    -- Conservative fallback: stay above the landmark rather than forcing a wall/void position.
+    return CFrame.new(BasePosition + Vector3.new(0, 7, 0))
 end
 
 local function TeleportTo(Key)
@@ -1129,10 +1194,10 @@ end)
 -- TELEPORT UI
 --==================================================
 
-CreateSection(T("teleport"))
+CreateSection("◈  " .. T("teleport"))
 
 TeleportGridFrame = Instance.new("Frame")
-TeleportGridFrame.Size = UDim2.new(1, 0, 0, 174)
+TeleportGridFrame.Size = UDim2.new(1, 0, 0, 180)
 TeleportGridFrame.BackgroundTransparency = 1
 TeleportGridFrame.Parent = Content
 
@@ -1154,6 +1219,7 @@ local function CreateTeleportButton(Text, Key)
     Button.AutoButtonColor = false
     Button.Parent = TeleportGridFrame
     AddCorner(Button, 8)
+    local TabStroke = AddStroke(Button, Colors.Red, 1, 0.75)
     Button.MouseEnter:Connect(function() Tween(Button, 0.1, {BackgroundColor3 = Colors.ButtonHover}) end)
     Button.MouseLeave:Connect(function() Tween(Button, 0.1, {BackgroundColor3 = Colors.Button}) end)
     Button.MouseButton1Click:Connect(function()
@@ -1169,9 +1235,9 @@ end
 
 
 CreateTeleportButton(T("tp914"), "914")
-CreateTeleportButton(T("tpClassD"), "classd")
 CreateTeleportButton(T("tpGateA"), "gatea")
 CreateTeleportButton(T("tpArmory"), "armory")
+CreateTeleportButton(T("tpMedkit"), "medkit")
 
 --==================================================
 -- NAVIGATION TABS
@@ -1297,9 +1363,10 @@ local function ExecuteCommand(Raw)
         end
         local Key = NormalizeCommand(Value)
         local TPMap = {
-            ["914"] = "914", ["classd"] = "classd", ["классд"] = "classd", ["class-d"] = "classd",
+            ["914"] = "914",
             ["gatea"] = "gatea", ["воротаа"] = "gatea", ["gate-a"] = "gatea",
-            ["armory"] = "armory", ["armoury"] = "armory", ["оружейная"] = "armory", ["оружейка"] = "armory"
+            ["armory"] = "armory", ["armoury"] = "armory", ["оружейная"] = "armory", ["оружейка"] = "armory",
+            ["medkit"] = "medkit", ["medkits"] = "medkit", ["мед"] = "medkit", ["аптечки"] = "medkit", ["аптечка"] = "medkit"
         }
         local TeleportKey = TPMap[Key]
         if not TeleportKey then
