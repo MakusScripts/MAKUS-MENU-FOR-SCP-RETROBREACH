@@ -849,110 +849,138 @@ end
 -- TELEPORT SYSTEM
 --==================================================
 
+--==================================================
+-- MUKUS MENU • TELEPORT SYSTEM (3 TARGETS ONLY)
+-- Targets:
+--   classd  = Class-D cells / spawn area
+--   medkit  = nearest actual medical pickup in Workspace
+--   armory  = Entrance Zone Armory
+--
+-- RetroBreach uses a changing/beta facility layout, so this resolver
+-- intentionally uses the live Workspace instead of hard-coded coordinates.
+--==================================================
+
 local TeleportAliases = {
-    ["914"] = {"scp914","scp-914","914","refiner","refinery"},
-    ["classd"] = {"classdcells","class-dcells","classdcells","dclasscells","d-classcells","dclass","class-d","prisonercells","prisonercell","cdcells","cellblock","cellblocks"},
-    ["armory"] = {"armory","armoury","weaponroom","weaponsroom","gunroom","guns","securityarmory","ezarmory","entrancearmory"},
-    ["medkit"] = {"medkit","medkits","medkitspawn","firstaid","firstaidkit","medicalkit","healthkit","bandage","bandages","medic","medical"},
-    ["035"] = {"scp035","scp-035","035","035chamber","mask","possessivemask"},
-    ["escape"] = {"gateb","gate-b","gatebdoor","gatebexit","surface","extraction","extract","escape","escapezone","surfaceexit","exit"}
+    classd = {
+        "classd", "class-d", "classdcells", "class-dcells",
+        "dclass", "d-class", "dclasscells", "prisonercells",
+        "prisonercell", "cellblock", "cellblocks", "cells"
+    },
+    medkit = {
+        "medkit", "medkits", "firstaid", "firstaidkit",
+        "medicalkit", "healthkit", "bandage", "bandages",
+        "medic", "medical"
+    },
+    armory = {
+        "armory", "armoury", "weaponroom", "weaponsroom",
+        "gunroom", "securityarmory", "ezarmory", "entrancearmory"
+    }
 }
 
-local TeleportHints = {
-    ["914"] = {"lcz","lightcontainment","light containment","914"},
-    ["classd"] = {"lcz","lightcontainment","classd","class-d","cells","prisoner"},
-    ["armory"] = {"ez","entrance","entrancezone","security","armory"},
-    ["medkit"] = {"med","medical","firstaid","health"},
-    ["035"] = {"hcz","heavycontainment","035"},
-    ["escape"] = {"ez","entrance","gateb","surface","extraction"}
+local TeleportZoneHints = {
+    classd = {"lcz", "lightcontainment", "lightcontainmentzone", "classd", "prisoner", "cell"},
+    medkit = {"lcz", "hcz", "ez", "medical", "med", "firstaid"},
+    armory = {"ez", "entrancezone", "entrance", "security", "armory"}
 }
 
-local function TPNormalize(s)
+local function TP_Norm(s)
     return tostring(s or ""):lower():gsub("[^%w]+", "")
 end
 
-local function TPPath(obj)
-    local p = {}
-    local cur = obj
-    for _ = 1, 10 do
-        if not cur then break end
-        table.insert(p, TPNormalize(cur.Name))
-        cur = cur.Parent
-    end
-    return table.concat(p, "/")
-end
-
-local function TPPosition(obj)
-    if obj:IsA("Attachment") then return obj.WorldPosition end
-    if obj:IsA("BasePart") then return obj.Position end
-    if obj:IsA("Model") then return obj:GetPivot().Position end
-    if obj:IsA("Tool") then
+local function TP_Pos(obj)
+    if obj:IsA("Attachment") then
+        return obj.WorldPosition
+    elseif obj:IsA("BasePart") then
+        return obj.Position
+    elseif obj:IsA("Model") then
+        return obj:GetPivot().Position
+    elseif obj:IsA("Tool") then
         local h = obj:FindFirstChild("Handle", true)
         if h and h:IsA("BasePart") then return h.Position end
         return obj:GetPivot().Position
     end
-    return nil
 end
 
-local function TPModel(obj)
+local function TP_Path(obj)
+    local parts = {}
+    local p = obj
+    for _ = 1, 14 do
+        if not p then break end
+        table.insert(parts, 1, TP_Norm(p.Name))
+        p = p.Parent
+    end
+    return table.concat(parts, "/")
+end
+
+local function TP_AncestorModel(obj)
     if obj:IsA("Model") then return obj end
     return obj:FindFirstAncestorOfClass("Model")
 end
 
--- The game map is procedural/beta, so hard-coded world coordinates are unreliable.
--- This resolver finds the actual landmark currently spawned in Workspace, then TP's
--- directly to that landmark (or its nearest doorway/entrance part).
-local function FindTeleportTarget(Key)
+local function TP_NameScore(name, aliases)
+    local n = TP_Norm(name)
+    local best = nil
+
+    for _, alias in ipairs(aliases) do
+        local a = TP_Norm(alias)
+
+        if n == a then
+            best = math.max(best or 0, 10000)
+        elseif #a >= 4 and string.find(n, a, 1, true) then
+            best = math.max(best or 0, 7000 - math.abs(#n - #a) * 3)
+        elseif #n >= 4 and string.find(a, n, 1, true) then
+            best = math.max(best or 0, 6000 - math.abs(#n - #a) * 3)
+        end
+    end
+
+    return best
+end
+
+local function TP_HintScore(path, hints)
+    local score = 0
+    for _, hint in ipairs(hints or {}) do
+        local h = TP_Norm(hint)
+        if h ~= "" and string.find(path, h, 1, true) then
+            score += 900
+        end
+    end
+    return score
+end
+
+local function TP_Find(Key)
     local aliases = TeleportAliases[Key]
     if not aliases then return nil end
 
-    local aliasSet, aliasWords = {}, {}
-    for _, a in ipairs(aliases) do
-        local n = TPNormalize(a)
-        aliasSet[n] = true
-        table.insert(aliasWords, n)
-    end
-
-    local hints = TeleportHints[Key] or {}
     local best, bestScore = nil, -math.huge
 
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("Attachment") or obj:IsA("Tool") then
-            local name = TPNormalize(obj.Name)
-            if name ~= "" then
-                local score = nil
-
-                -- Exact name is strongest.
-                if aliasSet[name] then
-                    score = 10000
-                else
-                    -- Partial/contains matching for different map naming conventions.
-                    for _, a in ipairs(aliasWords) do
-                        if #a >= 4 and (string.find(name, a, 1, true) or string.find(a, name, 1, true)) then
-                            local s = 7000 - math.abs(#name - #a) * 4
-                            if not score or s > score then score = s end
-                        end
-                    end
-                end
+        if obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("Tool") then
+            local pos = TP_Pos(obj)
+            if pos and pos.Y > workspace.FallenPartsDestroyHeight + 5 then
+                local score = TP_NameScore(obj.Name, aliases)
 
                 if score then
-                    local path = TPPath(obj)
-                    for _, h in ipairs(hints) do
-                        local hn = TPNormalize(h)
-                        if hn ~= "" and string.find(path, hn, 1, true) then
-                            score += 1200
-                        end
+                    local path = TP_Path(obj)
+                    score += TP_HintScore(path, TeleportZoneHints[Key])
+
+                    -- Prefer room/container models for destinations.
+                    if obj:IsA("Model") then score += 350 end
+
+                    -- Prefer objects that actually have geometry.
+                    if obj:IsA("Model") and #obj:GetDescendants() > 2 then
+                        score += 150
                     end
 
-                    -- Prefer actual room models over tiny decorative parts.
-                    if obj:IsA("Model") then score += 250 end
-                    if obj:IsA("Tool") then score += 100 end
+                    -- For an armory, EZ/Entrance path is important.
+                    if Key == "armory" then
+                        local np = TP_Norm(path)
+                        if string.find(np, "entrancezone", 1, true) then score += 1800 end
+                        if string.find(np, "ez", 1, true) then score += 1000 end
+                    end
 
-                    local pos = TPPosition(obj)
-                    if pos and pos.Y > workspace.FallenPartsDestroyHeight + 10 then
-                        if score > bestScore then
-                            best, bestScore = obj, score
-                        end
+                    if score > bestScore then
+                        best = obj
+                        bestScore = score
                     end
                 end
             end
@@ -962,35 +990,34 @@ local function FindTeleportTarget(Key)
     return best
 end
 
-local function FindTeleportAnchor(target, key)
-    local root = TPModel(target)
-    if not root then return target end
-
-    local wanted = {
-        "entrance","entry","door","doora","doorb","gate","exit","hallway",
-        "corridor","floor","spawn","cells","cell","chamber","room"
-    }
+local function TP_FindBestPart(target, Key)
+    local model = TP_AncestorModel(target)
+    if not model then return target end
 
     local best, bestScore = nil, -math.huge
-    local targetPos = TPPosition(target) or root:GetPivot().Position
 
-    for _, obj in ipairs(root:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("Attachment") then
-            local n = TPNormalize(obj.Name)
+    -- These are only anchors inside the already-selected destination.
+    local anchors = {
+        "entrance", "entry", "door", "gate", "hall", "hallway",
+        "corridor", "floor", "spawn", "center", "middle", "room"
+    }
+
+    local center = model:GetPivot().Position
+
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.CanCollide then
+            local n = TP_Norm(obj.Name)
             local score = 0
 
-            for i, w in ipairs(wanted) do
-                if string.find(n, w, 1, true) then
-                    score += 300 - i
+            for i, word in ipairs(anchors) do
+                if string.find(n, word, 1, true) then
+                    score += 500 - i * 10
                 end
             end
 
-            local pos = TPPosition(obj)
-            if pos then
-                local d = (pos - targetPos).Magnitude
-                score -= math.min(d, 100) * 0.5
-                if obj:IsA("BasePart") and obj.CanCollide then score += 20 end
-            end
+            -- A named floor/door is preferred, but don't reject ordinary parts.
+            local dist = (obj.Position - center).Magnitude
+            score -= math.min(dist, 150) * 0.15
 
             if score > bestScore then
                 best, bestScore = obj, score
@@ -1002,43 +1029,49 @@ local function FindTeleportAnchor(target, key)
 end
 
 local function TeleportTo(Key)
-    local target = FindTeleportTarget(Key)
+    local target = TP_Find(Key)
+
     if not target then
-        return false, T("tpFail") .. Key
+        return false, T("tpFail") .. " " .. Key
     end
 
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
     if not character or not root or not humanoid then
-        return false, T("tpFail") .. Key
+        return false, T("tpFail") .. " " .. Key
     end
 
-    local anchor = FindTeleportAnchor(target, Key)
-    local pos = TPPosition(anchor) or TPPosition(target)
+    local anchor = TP_FindBestPart(target, Key)
+    local pos = TP_Pos(anchor) or TP_Pos(target)
+
     if not pos then
-        return false, T("tpFail") .. Key
+        return false, T("tpFail") .. " " .. Key
     end
 
-    -- Direct landmark TP. No random safe-point search and no map-wide coordinates.
-    -- Offset is small so the player arrives at the landmark rather than far away.
-    local destination = pos + Vector3.new(0, 3.5, 0)
+    -- Deliberate fixed placement relative to the selected live map object.
+    local destination = pos + Vector3.new(0, 4, 0)
 
     local oldRotate = humanoid.AutoRotate
     humanoid.AutoRotate = false
+
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
 
     character:PivotTo(CFrame.new(destination))
 
-    task.wait()
+    task.wait(0.08)
+
     if root.Parent then
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.zero
     end
 
     task.delay(0.15, function()
-        if humanoid.Parent then humanoid.AutoRotate = oldRotate end
+        if humanoid.Parent then
+            humanoid.AutoRotate = oldRotate
+        end
     end)
 
     return true, T("tpOk") .. " " .. Key
@@ -1267,12 +1300,9 @@ local function CreateTeleportButton(Text, Key)
 end
 
 
-CreateTeleportButton(T("tp914"), "914")
 CreateTeleportButton(T("tpClassD"), "classd")
-CreateTeleportButton(T("tpArmory"), "armory")
 CreateTeleportButton(T("tpMedkit"), "medkit")
-CreateTeleportButton(T("tp035"), "035")
-CreateTeleportButton(T("tpEscape"), "escape")
+CreateTeleportButton(T("tpArmory"), "armory")
 
 --==================================================
 -- NAVIGATION TABS
@@ -1398,12 +1428,9 @@ local function ExecuteCommand(Raw)
         end
         local Key = NormalizeCommand(Value)
         local TPMap = {
-            ["914"] = "914",
             ["armory"] = "armory", ["armoury"] = "armory", ["оружейная"] = "armory", ["оружейка"] = "armory",
             ["medkit"] = "medkit", ["medkits"] = "medkit", ["мед"] = "medkit", ["аптечки"] = "medkit", ["аптечка"] = "medkit",
-            ["classd"] = "classd", ["dclass"] = "classd", ["dкласс"] = "classd", ["дкласс"] = "classd", ["классд"] = "classd", ["камерыd"] = "classd",
-            ["035"] = "035", ["scp035"] = "035", ["маска"] = "035", ["скп035"] = "035",
-            ["escape"] = "escape", ["exit"] = "escape", ["выход"] = "escape", ["свобода"] = "escape", ["gateb"] = "escape", ["воротаб"] = "escape"
+            ["classd"] = "classd", ["dclass"] = "classd", ["dкласс"] = "classd", ["дкласс"] = "classd", ["классд"] = "classd", ["камерыd"] = "classd"
         }
         local TeleportKey = TPMap[Key]
         if not TeleportKey then
