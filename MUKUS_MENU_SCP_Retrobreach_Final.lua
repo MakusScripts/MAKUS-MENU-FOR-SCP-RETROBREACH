@@ -1,4 +1,4 @@
-
+--// MUKUS MENU
 --// SCP retroBreach - LocalScript -> StarterPlayer -> StarterPlayerScripts
 --// UI / client utility panel for Studio testing
 
@@ -101,16 +101,19 @@ local Lang = {
         tpGateA = "GATE A",
         tpMedkit = "MEDKITS",
         tpArmory = "ARMORY",
+        tpClassD = "CLASS-D CELLS",
+        tp035 = "SCP-035 MASK",
+        tpEscape = "ESCAPE / GATE B",
         hidden = "Location not found in this server",
         menuHint = "F4 • Drag panel • Right mouse = aim",
         unknown = "UNKNOWN COMMAND • TYPE help",
-        help = "help | status | noclip on/off | esp on/off | aim on/off | speed on/off | speed 32 | fov 80 | fullbright on/off | crosshair on/off | tp 914/gatea/armory/medkit | reset | rejoin",
+        help = "help | status | noclip on/off | esp on/off | aim on/off | speed on/off | speed 32 | fov 80 | fullbright on/off | crosshair on/off | tp 914/classd/armory/medkit/035/escape | reset | rejoin",
         reset = "RESET EXECUTED",
         rejoin = "REJOINING...",
         fovUsage = "USAGE: fov 40-120",
         fovSet = "FOV SET: ",
         speedSet = "SPEED SET: ",
-        tpUsage = "USAGE: tp 914 / gatea / armory / medkit",
+        tpUsage = "USAGE: tp 914 / classd / armory / medkit / 035 / escape",
         tpOk = "TELEPORTED: ",
         tpFail = "TARGET NOT FOUND: ",
         status = "NC:%s ESP:%s AIM:%s SPD:%s FB:%s"
@@ -149,16 +152,19 @@ local Lang = {
         tpGateA = "ВОРОТА A",
         tpMedkit = "АПТЕЧКИ",
         tpArmory = "ОРУЖЕЙНАЯ",
+        tpClassD = "КАМЕРЫ D-КЛАССА",
+        tp035 = "SCP-035 МАСКА",
+        tpEscape = "ВЫХОД / GATE B",
         hidden = "Точка не найдена на этом сервере",
         menuHint = "F4 • Перетаскивание • ПКМ = аим",
         unknown = "НЕИЗВЕСТНАЯ КОМАНДА • ВВЕДИТЕ помощь",
-        help = "помощь | статус | ноклип вкл/выкл | есп вкл/выкл | аим вкл/выкл | скорость вкл/выкл | скорость 32 | фов 80 | фуллбрайт вкл/выкл | прицел вкл/выкл | тп 914/воротаа/оружейная/аптечки | сброс | перезаход",
+        help = "помощь | статус | ноклип вкл/выкл | есп вкл/выкл | аим вкл/выкл | скорость вкл/выкл | скорость 32 | фов 80 | фуллбрайт вкл/выкл | прицел вкл/выкл | тп 914/dкласс/оружейная/аптечки/035/выход | сброс | перезаход",
         reset = "СБРОС ВЫПОЛНЕН",
         rejoin = "ПЕРЕЗАХОД...",
         fovUsage = "ИСПОЛЬЗОВАНИЕ: фов 40-120",
         fovSet = "FOV УСТАНОВЛЕН: ",
         speedSet = "СКОРОСТЬ УСТАНОВЛЕНА: ",
-        tpUsage = "ИСПОЛЬЗОВАНИЕ: тп 914 / воротаа / оружейная / аптечки",
+        tpUsage = "ИСПОЛЬЗОВАНИЕ: тп 914 / dкласс / оружейная / аптечки / 035 / выход",
         tpOk = "ТЕЛЕПОРТ: ",
         tpFail = "ТОЧКА НЕ НАЙДЕНА: ",
         status = "НОК:%s ESP:%s АИМ:%s СКР:%s FB:%s"
@@ -844,50 +850,84 @@ end
 --==================================================
 
 local TeleportAliases = {
-    ["914"] = {"SCP-914", "SCP914", "914", "room914", "914Room", "Refiner"},
-    ["gatea"] = {"Gate A", "GateA", "GATE_A", "gateaentrance", "Gate_A", "GateAEntrance"},
-    ["armory"] = {"Armory", "Armoury", "Light Armory", "LightArmory", "Light Armoury", "WeaponRoom", "Weapons", "GunRoom", "SecurityArmory"},
-    ["medkit"] = {"Medkit", "Medkits", "Med Kit", "Med Kits", "First Aid", "FirstAid", "Medical", "MedicalKit", "HealthKit", "Bandage", "Bandages", "Med"}
+    ["914"] = {"SCP-914", "SCP914", "914", "room914", "914Room", "Refiner", "SCP_914"},
+    ["armory"] = {"EZ Armory", "Entrance Armory", "Armory", "Armoury", "Security Armory", "SecurityArmory", "WeaponRoom", "Weapons", "GunRoom"},
+    ["medkit"] = {"Medkit", "Medkits", "Med Kit", "Med Kits", "First Aid", "FirstAid", "MedicalKit", "HealthKit", "Bandage", "Bandages"},
+    ["classd"] = {"Class-D Cells", "Class D Cells", "Class-D", "ClassD", "Class_D", "D-Class Cells", "DClassCells", "D-Class", "DClass", "Prisoner Cells", "PrisonerCells"},
+    ["035"] = {"SCP-035", "SCP035", "035", "SCP_035", "035 Chamber", "035 Chamber", "Mask", "Possessive Mask"},
+    ["escape"] = {"Gate B", "GateB", "GATE_B", "Gate_B", "Gate B Topside", "Gate B Inbound", "Surface", "Escape", "Extraction", "Exit", "Escape Room"}
+}
+
+-- Destination-specific preferences. These are semantic offsets from the actual
+-- landmark orientation, not hard-coded map coordinates. The map is beta and can
+-- change between patches, so this avoids sending the player to stale world coords.
+local TeleportProfiles = {
+    ["914"]   = {preferNames = {"Floor", "Entrance", "Door", "Exit", "Hallway", "SCP-914 Entrance"}, offsets = {Vector3.new(0, 0, -7), Vector3.new(7, 0, 0), Vector3.new(-7, 0, 0), Vector3.new(0, 0, 7)}},
+    ["armory"] = {preferNames = {"Entrance", "Door", "Lobby", "Hall", "Floor"}, offsets = {Vector3.new(0, 0, -8), Vector3.new(8, 0, 0), Vector3.new(-8, 0, 0), Vector3.new(0, 0, 8)}},
+    ["medkit"] = {preferNames = {"Medical Bay", "MedicalBay", "First Aid", "Floor", "Entrance"}, offsets = {Vector3.new(0, 0, -5), Vector3.new(5, 0, 0), Vector3.new(-5, 0, 0), Vector3.new(0, 0, 5)}},
+    ["classd"] = {preferNames = {"Cells Entrance", "Cell Entrance", "Door", "Hallway", "Floor", "Spawn"}, offsets = {Vector3.new(0, 0, 10), Vector3.new(10, 0, 0), Vector3.new(-10, 0, 0), Vector3.new(0, 0, -10)}},
+    ["035"]   = {preferNames = {"Observation", "Control Room", "Entrance", "Door", "Floor", "Chamber"}, offsets = {Vector3.new(0, 0, -8), Vector3.new(8, 0, 0), Vector3.new(-8, 0, 0), Vector3.new(0, 0, 8)}},
+    ["escape"] = {preferNames = {"Elevator", "Entrance", "Exit", "Surface", "Floor", "Gate"}, offsets = {Vector3.new(0, 0, -10), Vector3.new(10, 0, 0), Vector3.new(-10, 0, 0), Vector3.new(0, 0, 10)}}
 }
 
 local function NormalizeName(Text)
     return tostring(Text):lower():gsub("[^%w]", "")
 end
 
+local TeleportZoneHints = {
+    ["914"] = {"LCZ", "Light Containment", "LightContainment"},
+    ["classd"] = {"LCZ", "Light Containment", "LightContainment", "Class-D"},
+    ["armory"] = {"EZ", "Entrance", "EntranceZone", "Security"},
+    ["035"] = {"HCZ", "Heavy Containment", "HeavyContainment"},
+    ["escape"] = {"GateB", "Gate B", "Surface", "Entrance", "EZ"},
+    ["medkit"] = {"Medical", "Med", "EZ", "LCZ"}
+}
+
+local function GetObjectPathName(Object)
+    local parts = {}
+    local current = Object
+    for _ = 1, 8 do
+        if not current then break end
+        table.insert(parts, NormalizeName(current.Name))
+        current = current.Parent
+    end
+    return table.concat(parts, " ")
+end
+
 local function FindTeleportTarget(Key)
     local Aliases = TeleportAliases[Key]
     if not Aliases then return nil end
 
-    -- Exact matches first. Prefer a Model/Attachment so a decorative wall part
-    -- with the same name does not become the teleport anchor.
-    local ExactBaseParts = {}
-    for _, Alias in ipairs(Aliases) do
-        local Direct = workspace:FindFirstChild(Alias, true)
-        if Direct and (Direct:IsA("Model") or Direct:IsA("Attachment")) then
-            return Direct
-        elseif Direct and Direct:IsA("BasePart") then
-            table.insert(ExactBaseParts, Direct)
-        end
-    end
-    if #ExactBaseParts > 0 then
-        return ExactBaseParts[1]
-    end
-
-    -- Normalized fallback for names such as SCP_173 / SCP 173.
     local NormalizedAliases = {}
-    for _, Alias in ipairs(Aliases) do
-        NormalizedAliases[NormalizeName(Alias)] = true
+    local AliasRank = {}
+    for i, Alias in ipairs(Aliases) do
+        local n = NormalizeName(Alias)
+        NormalizedAliases[n] = true
+        AliasRank[n] = i
     end
+    local Hints = TeleportZoneHints[Key] or {}
 
+    local best, bestScore
     for _, Object in ipairs(workspace:GetDescendants()) do
         if Object:IsA("BasePart") or Object:IsA("Model") or Object:IsA("Attachment") then
-            if NormalizedAliases[NormalizeName(Object.Name)] then
-                return Object
+            local normalized = NormalizeName(Object.Name)
+            if NormalizedAliases[normalized] then
+                local path = GetObjectPathName(Object)
+                local score = 1000 - (AliasRank[normalized] or 100) * 5
+                for _, hint in ipairs(Hints) do
+                    if string.find(path, NormalizeName(hint), 1, true) then
+                        score += 150
+                    end
+                end
+                if Object:IsA("Model") then score += 15 end
+                if Object:IsA("Attachment") then score += 10 end
+                if not bestScore or score > bestScore then
+                    best, bestScore = Object, score
+                end
             end
         end
     end
-
-    return nil
+    return best
 end
 
 local function GetTargetPosition(Target)
@@ -900,8 +940,29 @@ local function GetTargetPosition(Target)
     end
 end
 
-local function FindSafeTeleportCFrame(Target)
-    local BasePosition = GetTargetPosition(Target)
+local function FindPreferredAnchor(Target, Key)
+    local Profile = TeleportProfiles[Key]
+    if not Profile then return Target end
+    local Root = Target:IsA("Model") and Target or Target:FindFirstAncestorOfClass("Model")
+    if not Root then return Target end
+
+    local wanted = {}
+    for _, n in ipairs(Profile.preferNames) do wanted[NormalizeName(n)] = true end
+    local best, bestDist
+    local origin = GetTargetPosition(Target) or Root:GetPivot().Position
+    for _, obj in ipairs(Root:GetDescendants()) do
+        if (obj:IsA("BasePart") or obj:IsA("Attachment")) and wanted[NormalizeName(obj.Name)] then
+            local pos = obj:IsA("Attachment") and obj.WorldPosition or obj.Position
+            local d = (pos - origin).Magnitude
+            if not bestDist or d < bestDist then best, bestDist = obj, d end
+        end
+    end
+    return best or Target
+end
+
+local function FindSafeTeleportCFrame(Target, Key)
+    local Anchor = FindPreferredAnchor(Target, Key)
+    local BasePosition = GetTargetPosition(Anchor)
     if not BasePosition then return nil end
 
     local Character = LocalPlayer.Character
@@ -914,103 +975,79 @@ local function FindSafeTeleportCFrame(Target)
     Overlap.FilterType = Enum.RaycastFilterType.Exclude
     Overlap.FilterDescendantsInstances = Ignore
 
-    -- Use a wider search grid around the landmark instead of its pivot.
-    -- This is important for SCP-914: its model pivot can be inside the machine/wall.
-    local CandidateOffsets = {}
-    for Radius = 4, 18, 2 do
-        for Step = 0, 15 do
-            local Angle = math.rad(Step * 22.5)
-            table.insert(CandidateOffsets, Vector3.new(math.cos(Angle) * Radius, 14, math.sin(Angle) * Radius))
+    local Profile = TeleportProfiles[Key] or {offsets = {Vector3.zero}}
+    local candidates = {}
+    local anchorCF = Anchor:IsA("BasePart") and Anchor.CFrame or (Anchor:IsA("Model") and Anchor:GetPivot() or CFrame.new(BasePosition))
+    for _, offset in ipairs(Profile.offsets or {Vector3.zero}) do
+        table.insert(candidates, anchorCF:PointToWorldSpace(offset + Vector3.new(0, 10, 0)))
+    end
+    -- Extra fallback ring around the landmark.
+    for radius = 5, 18, 3 do
+        for i = 0, 11 do
+            local a = math.rad(i * 30)
+            table.insert(candidates, BasePosition + Vector3.new(math.cos(a) * radius, 12, math.sin(a) * radius))
         end
     end
-    table.insert(CandidateOffsets, Vector3.new(0, 14, 0))
 
-    local BestCFrame = nil
-    local BestScore = math.huge
-
-    for _, Offset in ipairs(CandidateOffsets) do
-        local Probe = BasePosition + Offset
-        local Down = workspace:Raycast(Probe, Vector3.new(0, -45, 0), Params)
-        if Down and Down.Instance and Down.Position.Y > workspace.FallenPartsDestroyHeight + 25 then
-            local Floor = Down.Position + Vector3.new(0, 3.4, 0)
-            local FlatToTarget = Vector3.new(BasePosition.X - Floor.X, 0, BasePosition.Z - Floor.Z)
-            local Facing = FlatToTarget.Magnitude > 0.25 and FlatToTarget.Unit or Vector3.new(0, 0, -1)
-
-            -- Check a player-sized volume for obvious wall/prop intersections.
+    local BestCFrame, BestScore = nil, math.huge
+    for _, Probe in ipairs(candidates) do
+        local Down = workspace:Raycast(Probe, Vector3.new(0, -50, 0), Params)
+        if Down and Down.Instance and Down.Position.Y > workspace.FallenPartsDestroyHeight + 25 and Down.Normal.Y >= 0.8 then
+            local Floor = Down.Position + Vector3.new(0, 3.1, 0)
             local Blockers = workspace:GetPartBoundsInBox(CFrame.new(Floor), Vector3.new(4.5, 6, 4.5), Overlap)
             local Blocked = false
             for _, Part in ipairs(Blockers) do
-                if Part.CanCollide and Part.Transparency < 0.98 and not Part:IsDescendantOf(Target) then
+                if Part.CanCollide and Part.Transparency < 0.98 then
                     Blocked = true
                     break
                 end
             end
-
             if not Blocked then
-                local Distance = (Vector3.new(Floor.X, 0, Floor.Z) - Vector3.new(BasePosition.X, 0, BasePosition.Z)).Magnitude
-                local Score = Distance
-                -- Prefer spots slightly away from the exact pivot and with a direct floor hit.
-                if Down.Instance:IsDescendantOf(Target) then Score += 8 end
-                if math.abs(Down.Normal.Y) < 0.75 then Score += 20 end
-                if Score < BestScore then
-                    BestScore = Score
-                    BestCFrame = CFrame.lookAt(Floor, Floor + Facing)
+                -- Reject positions too far from the actual landmark: this keeps TP deterministic.
+                local distance = (Floor - BasePosition).Magnitude
+                local maxDistance = (Key == "escape") and 35 or 24
+                if distance <= maxDistance then
+                    local score = distance
+                    if Down.Instance:IsDescendantOf(Target) then score += 12 end
+                    if score < BestScore then
+                        BestScore = score
+                        BestCFrame = CFrame.new(Floor)
+                    end
                 end
             end
         end
     end
-
-    if BestCFrame then
-        return BestCFrame
-    end
-
-    -- Conservative fallback: stay above the landmark rather than forcing a wall/void position.
-    return CFrame.new(BasePosition + Vector3.new(0, 7, 0))
+    return BestCFrame
 end
 
 local function TeleportTo(Key)
     local Target = FindTeleportTarget(Key)
-    if not Target then
-        return false, T("tpFail") .. Key .. " • " .. T("hidden")
-    end
-
+    if not Target then return false, T("tpFail") .. Key .. " • " .. T("hidden") end
     local Character = LocalPlayer.Character
     local Root = Character and Character:FindFirstChild("HumanoidRootPart")
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-    if not Character or not Root or not Humanoid then
-        return false, T("tpFail") .. Key
-    end
+    if not Character or not Root or not Humanoid then return false, T("tpFail") .. Key end
 
-    local SafeCFrame = FindSafeTeleportCFrame(Target)
-    if not SafeCFrame then
-        return false, T("tpFail") .. Key
-    end
+    local SafeCFrame = FindSafeTeleportCFrame(Target, Key)
+    if not SafeCFrame then return false, T("tpFail") .. Key end
 
     local OldAutoRotate = Humanoid.AutoRotate
-    local OldVelocity = Root.AssemblyLinearVelocity
-    local OldAngular = Root.AssemblyAngularVelocity
-
     Humanoid.AutoRotate = false
     Root.AssemblyLinearVelocity = Vector3.zero
     Root.AssemblyAngularVelocity = Vector3.zero
-
-    -- Two short placement passes reduce the chance of spawning inside geometry.
     Character:PivotTo(SafeCFrame)
-    task.wait()
+    task.wait(0.05)
     if Root.Parent then
         Root.AssemblyLinearVelocity = Vector3.zero
         Root.AssemblyAngularVelocity = Vector3.zero
         Character:PivotTo(SafeCFrame)
     end
-
-    task.delay(0.15, function()
-        if Humanoid.Parent then
-            Humanoid.AutoRotate = OldAutoRotate
-        end
+    task.delay(0.2, function()
+        if Humanoid.Parent then Humanoid.AutoRotate = OldAutoRotate end
     end)
-
     return true, T("tpOk") .. Key
 end
+
 --==================================================
 -- SPEED CONTROL
 --==================================================
@@ -1197,7 +1234,7 @@ end)
 CreateSection("◈  " .. T("teleport"))
 
 TeleportGridFrame = Instance.new("Frame")
-TeleportGridFrame.Size = UDim2.new(1, 0, 0, 180)
+TeleportGridFrame.Size = UDim2.new(1, 0, 0, 230)
 TeleportGridFrame.BackgroundTransparency = 1
 TeleportGridFrame.Parent = Content
 
@@ -1235,9 +1272,11 @@ end
 
 
 CreateTeleportButton(T("tp914"), "914")
-CreateTeleportButton(T("tpGateA"), "gatea")
+CreateTeleportButton(T("tpClassD"), "classd")
 CreateTeleportButton(T("tpArmory"), "armory")
 CreateTeleportButton(T("tpMedkit"), "medkit")
+CreateTeleportButton(T("tp035"), "035")
+CreateTeleportButton(T("tpEscape"), "escape")
 
 --==================================================
 -- NAVIGATION TABS
@@ -1364,9 +1403,11 @@ local function ExecuteCommand(Raw)
         local Key = NormalizeCommand(Value)
         local TPMap = {
             ["914"] = "914",
-            ["gatea"] = "gatea", ["воротаа"] = "gatea", ["gate-a"] = "gatea",
             ["armory"] = "armory", ["armoury"] = "armory", ["оружейная"] = "armory", ["оружейка"] = "armory",
-            ["medkit"] = "medkit", ["medkits"] = "medkit", ["мед"] = "medkit", ["аптечки"] = "medkit", ["аптечка"] = "medkit"
+            ["medkit"] = "medkit", ["medkits"] = "medkit", ["мед"] = "medkit", ["аптечки"] = "medkit", ["аптечка"] = "medkit",
+            ["classd"] = "classd", ["dclass"] = "classd", ["dкласс"] = "classd", ["дкласс"] = "classd", ["классд"] = "classd", ["камерыd"] = "classd",
+            ["035"] = "035", ["scp035"] = "035", ["маска"] = "035", ["скп035"] = "035",
+            ["escape"] = "escape", ["exit"] = "escape", ["выход"] = "escape", ["свобода"] = "escape", ["gateb"] = "escape", ["воротаб"] = "escape"
         }
         local TeleportKey = TPMap[Key]
         if not TeleportKey then
