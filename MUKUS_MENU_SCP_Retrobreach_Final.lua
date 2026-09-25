@@ -846,47 +846,44 @@ local function SetFullbright(Value)
 end
 
 --==================================================
--- TELEPORT SYSTEM
+-- TELEPORT SYSTEM (ROBUST / SAFE)
 --==================================================
 
 local TeleportAliases = {
-    ["914"] = {"SCP-914", "SCP914", "914", "room914", "914Room", "Refiner", "SCP_914"},
-    ["armory"] = {"EZ Armory", "Entrance Armory", "Armory", "Armoury", "Security Armory", "SecurityArmory", "WeaponRoom", "Weapons", "GunRoom"},
-    ["medkit"] = {"Medkit", "Medkits", "Med Kit", "Med Kits", "First Aid", "FirstAid", "MedicalKit", "HealthKit", "Bandage", "Bandages"},
-    ["classd"] = {"Class-D Cells", "Class D Cells", "Class-D", "ClassD", "Class_D", "D-Class Cells", "DClassCells", "D-Class", "DClass", "Prisoner Cells", "PrisonerCells"},
-    ["035"] = {"SCP-035", "SCP035", "035", "SCP_035", "035 Chamber", "035 Chamber", "Mask", "Possessive Mask"},
-    ["escape"] = {"Gate B", "GateB", "GATE_B", "Gate_B", "Gate B Topside", "Gate B Inbound", "Surface", "Escape", "Extraction", "Exit", "Escape Room"}
+    ["914"] = {"scp914", "scp-914", "room914", "914room", "refiner", "914"},
+    ["armory"] = {"ezarmory", "entrancearmory", "securityarmory", "armory", "armoury", "weaponroom", "weapons", "gunroom"},
+    ["medkit"] = {"medkit", "medkits", "medkitspawn", "firstaid", "medicalkit", "healthkit", "bandage", "bandages"},
+    ["classd"] = {"classdcells", "classdcells", "dclasscells", "prisonercells", "classd", "dclass"},
+    ["035"] = {"scp035", "035chamber", "possessivemask", "mask", "035"},
+    ["escape"] = {"gateb", "gatebtopside", "gatebinbound", "surface", "escape", "extraction", "escapezone", "exit"}
 }
 
--- Destination-specific preferences. These are semantic offsets from the actual
--- landmark orientation, not hard-coded map coordinates. The map is beta and can
--- change between patches, so this avoids sending the player to stale world coords.
+local TeleportZoneHints = {
+    ["914"] = {"lcz", "lightcontainment", "lightcontainmentzone"},
+    ["classd"] = {"lcz", "lightcontainment", "classd", "prisoner"},
+    ["armory"] = {"ez", "entrance", "entrancezone", "security"},
+    ["035"] = {"hcz", "heavycontainment", "heavycontainmentzone"},
+    ["escape"] = {"gateb", "surface", "ez", "entrance", "entrancezone"},
+    ["medkit"] = {"medical", "med", "lcz", "ez"}
+}
+
 local TeleportProfiles = {
-    ["914"]   = {preferNames = {"Floor", "Entrance", "Door", "Exit", "Hallway", "SCP-914 Entrance"}, offsets = {Vector3.new(0, 0, -7), Vector3.new(7, 0, 0), Vector3.new(-7, 0, 0), Vector3.new(0, 0, 7)}},
-    ["armory"] = {preferNames = {"Entrance", "Door", "Lobby", "Hall", "Floor"}, offsets = {Vector3.new(0, 0, -8), Vector3.new(8, 0, 0), Vector3.new(-8, 0, 0), Vector3.new(0, 0, 8)}},
-    ["medkit"] = {preferNames = {"Medical Bay", "MedicalBay", "First Aid", "Floor", "Entrance"}, offsets = {Vector3.new(0, 0, -5), Vector3.new(5, 0, 0), Vector3.new(-5, 0, 0), Vector3.new(0, 0, 5)}},
-    ["classd"] = {preferNames = {"Cells Entrance", "Cell Entrance", "Door", "Hallway", "Floor", "Spawn"}, offsets = {Vector3.new(0, 0, 10), Vector3.new(10, 0, 0), Vector3.new(-10, 0, 0), Vector3.new(0, 0, -10)}},
-    ["035"]   = {preferNames = {"Observation", "Control Room", "Entrance", "Door", "Floor", "Chamber"}, offsets = {Vector3.new(0, 0, -8), Vector3.new(8, 0, 0), Vector3.new(-8, 0, 0), Vector3.new(0, 0, 8)}},
-    ["escape"] = {preferNames = {"Elevator", "Entrance", "Exit", "Surface", "Floor", "Gate"}, offsets = {Vector3.new(0, 0, -10), Vector3.new(10, 0, 0), Vector3.new(-10, 0, 0), Vector3.new(0, 0, 10)}}
+    ["914"]   = {anchors = {"entrance", "door", "exit", "hallway", "floor", "scp914entrance"}, radius = 16},
+    ["classd"] = {anchors = {"cellsentrance", "cellentrance", "door", "hallway", "floor", "spawn"}, radius = 18},
+    ["armory"] = {anchors = {"entrance", "door", "lobby", "hall", "floor"}, radius = 16},
+    ["medkit"] = {anchors = {"medicalbay", "medical", "firstaid", "floor", "entrance"}, radius = 12},
+    ["035"] = {anchors = {"observation", "controlroom", "entrance", "door", "floor", "chamber"}, radius = 16},
+    ["escape"] = {anchors = {"gate", "entrance", "exit", "surface", "floor", "elevator"}, radius = 22}
 }
 
 local function NormalizeName(Text)
     return tostring(Text):lower():gsub("[^%w]", "")
 end
 
-local TeleportZoneHints = {
-    ["914"] = {"LCZ", "Light Containment", "LightContainment"},
-    ["classd"] = {"LCZ", "Light Containment", "LightContainment", "Class-D"},
-    ["armory"] = {"EZ", "Entrance", "EntranceZone", "Security"},
-    ["035"] = {"HCZ", "Heavy Containment", "HeavyContainment"},
-    ["escape"] = {"GateB", "Gate B", "Surface", "Entrance", "EZ"},
-    ["medkit"] = {"Medical", "Med", "EZ", "LCZ"}
-}
-
 local function GetObjectPathName(Object)
     local parts = {}
     local current = Object
-    for _ = 1, 8 do
+    for _ = 1, 12 do
         if not current then break end
         table.insert(parts, NormalizeName(current.Name))
         current = current.Parent
@@ -894,157 +891,277 @@ local function GetObjectPathName(Object)
     return table.concat(parts, " ")
 end
 
+local function GetWorldPosition(Object)
+    if not Object then return nil end
+    if Object:IsA("Attachment") then
+        return Object.WorldPosition
+    elseif Object:IsA("BasePart") then
+        return Object.Position
+    elseif Object:IsA("Model") then
+        local ok, cf = pcall(function() return Object:GetPivot() end)
+        return ok and cf.Position or nil
+    end
+    return nil
+end
+
+local function GetBounds(Object)
+    if not Object then return nil, nil end
+    if Object:IsA("Model") then
+        local ok, cf, size = pcall(function() return Object:GetBoundingBox() end)
+        if ok then return cf, size end
+    elseif Object:IsA("BasePart") then
+        return Object.CFrame, Object.Size
+    end
+    local pos = GetWorldPosition(Object)
+    return pos and CFrame.new(pos) or nil, Vector3.new(4, 4, 4)
+end
+
+local function NameMatches(normalizedName, alias)
+    local a = NormalizeName(alias)
+    if normalizedName == a then
+        return 100
+    end
+    if #a >= 4 and string.find(normalizedName, a, 1, true) then
+        return 55
+    end
+    return 0
+end
+
 local function FindTeleportTarget(Key)
     local Aliases = TeleportAliases[Key]
     if not Aliases then return nil end
 
-    local NormalizedAliases = {}
-    local AliasRank = {}
-    for i, Alias in ipairs(Aliases) do
-        local n = NormalizeName(Alias)
-        NormalizedAliases[n] = true
-        AliasRank[n] = i
-    end
     local Hints = TeleportZoneHints[Key] or {}
+    local Best, BestScore = nil, -math.huge
 
-    local best, bestScore
     for _, Object in ipairs(workspace:GetDescendants()) do
         if Object:IsA("BasePart") or Object:IsA("Model") or Object:IsA("Attachment") then
             local normalized = NormalizeName(Object.Name)
-            if NormalizedAliases[normalized] then
+            local score = 0
+
+            for index, alias in ipairs(Aliases) do
+                local matchScore = NameMatches(normalized, alias)
+                if matchScore > 0 then
+                    score = math.max(score, matchScore + math.max(0, 30 - index))
+                end
+            end
+
+            if score > 0 then
                 local path = GetObjectPathName(Object)
-                local score = 1000 - (AliasRank[normalized] or 100) * 5
+
                 for _, hint in ipairs(Hints) do
-                    if string.find(path, NormalizeName(hint), 1, true) then
-                        score += 150
+                    local h = NormalizeName(hint)
+                    if #h >= 3 and string.find(path, h, 1, true) then
+                        score += 80
                     end
                 end
-                if Object:IsA("Model") then score += 15 end
-                if Object:IsA("Attachment") then score += 10 end
-                if not bestScore or score > bestScore then
-                    best, bestScore = Object, score
+
+                -- Prefer a model/room container over a tiny decorative part.
+                if Object:IsA("Model") then
+                    score += 18
+                elseif Object:IsA("Attachment") then
+                    score += 8
+                end
+
+                local _, size = GetBounds(Object)
+                if size then
+                    -- Very tiny parts are usually props, not destinations.
+                    if size.X >= 2 and size.Z >= 2 then score += 5 end
+                end
+
+                if score > BestScore then
+                    Best = Object
+                    BestScore = score
                 end
             end
         end
     end
-    return best
-end
 
-local function GetTargetPosition(Target)
-    if Target:IsA("Attachment") then
-        return Target.WorldPosition
-    elseif Target:IsA("BasePart") then
-        return Target.Position
-    elseif Target:IsA("Model") then
-        return Target:GetPivot().Position
-    end
+    return Best
 end
 
 local function FindPreferredAnchor(Target, Key)
     local Profile = TeleportProfiles[Key]
     if not Profile then return Target end
-    local Root = Target:IsA("Model") and Target or Target:FindFirstAncestorOfClass("Model")
-    if not Root then return Target end
 
-    local wanted = {}
-    for _, n in ipairs(Profile.preferNames) do wanted[NormalizeName(n)] = true end
-    local best, bestDist
-    local origin = GetTargetPosition(Target) or Root:GetPivot().Position
-    for _, obj in ipairs(Root:GetDescendants()) do
-        if (obj:IsA("BasePart") or obj:IsA("Attachment")) and wanted[NormalizeName(obj.Name)] then
-            local pos = obj:IsA("Attachment") and obj.WorldPosition or obj.Position
-            local d = (pos - origin).Magnitude
-            if not bestDist or d < bestDist then best, bestDist = obj, d end
+    local TargetPos = GetWorldPosition(Target)
+    if not TargetPos then return Target end
+
+    local best, bestScore = nil, -math.huge
+    local current = Target
+
+    -- Search several ancestor containers. The previous version only searched
+    -- one model level, which often made SCP-914/Armory resolve to a wall part.
+    for _ = 1, 6 do
+        if not current then break end
+
+        for _, obj in ipairs(current:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("Attachment") then
+                local n = NormalizeName(obj.Name)
+                for index, wanted in ipairs(Profile.anchors) do
+                    local w = NormalizeName(wanted)
+                    if n == w or (#w >= 4 and string.find(n, w, 1, true)) then
+                        local pos = GetWorldPosition(obj)
+                        if pos then
+                            local distance = (pos - TargetPos).Magnitude
+                            local score = 200 - index * 10 - distance
+                            if score > bestScore then
+                                best = obj
+                                bestScore = score
+                            end
+                        end
+                    end
+                end
+            end
         end
+
+        current = current.Parent
     end
+
     return best or Target
 end
 
-local function FindSafeTeleportCFrame(Target, Key)
-    local Anchor = FindPreferredAnchor(Target, Key)
-    local BasePosition = GetTargetPosition(Anchor)
-    if not BasePosition then return nil end
+local function IsSpaceFree(CFramePosition, Overlap, Character)
+    local parts = workspace:GetPartBoundsInBox(
+        CFrame.new(CFramePosition),
+        Vector3.new(4.5, 6.2, 4.5),
+        Overlap
+    )
 
-    local Character = LocalPlayer.Character
-    local Ignore = {Character}
-    local Params = RaycastParams.new()
-    Params.FilterType = Enum.RaycastFilterType.Exclude
-    Params.FilterDescendantsInstances = Ignore
-
-    local Overlap = OverlapParams.new()
-    Overlap.FilterType = Enum.RaycastFilterType.Exclude
-    Overlap.FilterDescendantsInstances = Ignore
-
-    local Profile = TeleportProfiles[Key] or {offsets = {Vector3.zero}}
-    local candidates = {}
-    local anchorCF = Anchor:IsA("BasePart") and Anchor.CFrame or (Anchor:IsA("Model") and Anchor:GetPivot() or CFrame.new(BasePosition))
-    for _, offset in ipairs(Profile.offsets or {Vector3.zero}) do
-        table.insert(candidates, anchorCF:PointToWorldSpace(offset + Vector3.new(0, 10, 0)))
-    end
-    -- Extra fallback ring around the landmark.
-    for radius = 5, 18, 3 do
-        for i = 0, 11 do
-            local a = math.rad(i * 30)
-            table.insert(candidates, BasePosition + Vector3.new(math.cos(a) * radius, 12, math.sin(a) * radius))
+    for _, part in ipairs(parts) do
+        if part.CanCollide and part.Transparency < 0.98 and not part:IsDescendantOf(Character) then
+            return false
         end
     end
 
-    local BestCFrame, BestScore = nil, math.huge
-    for _, Probe in ipairs(candidates) do
-        local Down = workspace:Raycast(Probe, Vector3.new(0, -50, 0), Params)
-        if Down and Down.Instance and Down.Position.Y > workspace.FallenPartsDestroyHeight + 25 and Down.Normal.Y >= 0.8 then
-            local Floor = Down.Position + Vector3.new(0, 3.1, 0)
-            local Blockers = workspace:GetPartBoundsInBox(CFrame.new(Floor), Vector3.new(4.5, 6, 4.5), Overlap)
-            local Blocked = false
-            for _, Part in ipairs(Blockers) do
-                if Part.CanCollide and Part.Transparency < 0.98 then
-                    Blocked = true
-                    break
-                end
-            end
-            if not Blocked then
-                -- Reject positions too far from the actual landmark: this keeps TP deterministic.
-                local distance = (Floor - BasePosition).Magnitude
-                local maxDistance = (Key == "escape") and 35 or 24
-                if distance <= maxDistance then
+    return true
+end
+
+local function FindSafeTeleportCFrame(Target, Key)
+    local Character = LocalPlayer.Character
+    if not Character then return nil end
+
+    local Anchor = FindPreferredAnchor(Target, Key)
+    local AnchorCF, AnchorSize = GetBounds(Anchor)
+    if not AnchorCF then return nil end
+
+    local Params = RaycastParams.new()
+    Params.FilterType = Enum.RaycastFilterType.Exclude
+    Params.FilterDescendantsInstances = {Character}
+
+    local Overlap = OverlapParams.new()
+    Overlap.FilterType = Enum.RaycastFilterType.Exclude
+    Overlap.FilterDescendantsInstances = {Character}
+
+    local Profile = TeleportProfiles[Key] or {radius = 14}
+    local center = AnchorCF.Position
+    local candidates = {}
+
+    -- Sample the outside of the actual landmark bounds first.
+    local halfX = math.max(3, AnchorSize.X * 0.5 + 3.5)
+    local halfZ = math.max(3, AnchorSize.Z * 0.5 + 3.5)
+
+    local offsets = {
+        Vector3.new(halfX, 14, 0),
+        Vector3.new(-halfX, 14, 0),
+        Vector3.new(0, 14, halfZ),
+        Vector3.new(0, 14, -halfZ),
+        Vector3.new(halfX, 14, halfZ),
+        Vector3.new(-halfX, 14, halfZ),
+        Vector3.new(halfX, 14, -halfZ),
+        Vector3.new(-halfX, 14, -halfZ)
+    }
+
+    for _, offset in ipairs(offsets) do
+        table.insert(candidates, AnchorCF:PointToWorldSpace(offset))
+    end
+
+    -- Fallback ring around the landmark.
+    for radius = 5, Profile.radius, 3 do
+        for i = 0, 15 do
+            local angle = math.rad(i * 22.5)
+            table.insert(candidates, center + Vector3.new(
+                math.cos(angle) * radius,
+                16,
+                math.sin(angle) * radius
+            ))
+        end
+    end
+
+    local best, bestScore = nil, math.huge
+
+    for _, probe in ipairs(candidates) do
+        local down = workspace:Raycast(probe, Vector3.new(0, -80, 0), Params)
+
+        if down and down.Position.Y > workspace.FallenPartsDestroyHeight + 25 and down.Normal.Y >= 0.75 then
+            local position = down.Position + Vector3.new(0, 3.25, 0)
+
+            if IsSpaceFree(position, Overlap, Character) then
+                local distance = (position - center).Magnitude
+
+                -- Keep the TP close to the selected landmark.
+                if distance <= Profile.radius + math.max(AnchorSize.X, AnchorSize.Z) + 6 then
                     local score = distance
-                    if Down.Instance:IsDescendantOf(Target) then score += 12 end
-                    if score < BestScore then
-                        BestScore = score
-                        BestCFrame = CFrame.new(Floor)
+
+                    -- Prefer the actual floor immediately outside the target.
+                    if down.Instance:IsDescendantOf(Target) then
+                        score -= 4
+                    end
+
+                    if score < bestScore then
+                        best = CFrame.new(position)
+                        bestScore = score
                     end
                 end
             end
         end
     end
-    return BestCFrame
+
+    return best
 end
 
 local function TeleportTo(Key)
-    local Target = FindTeleportTarget(Key)
-    if not Target then return false, T("tpFail") .. Key .. " • " .. T("hidden") end
     local Character = LocalPlayer.Character
     local Root = Character and Character:FindFirstChild("HumanoidRootPart")
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-    if not Character or not Root or not Humanoid then return false, T("tpFail") .. Key end
+
+    if not Character or not Root or not Humanoid then
+        return false, T("tpFail") .. Key
+    end
+
+    local Target = FindTeleportTarget(Key)
+    if not Target then
+        return false, T("tpFail") .. Key .. " • " .. T("hidden")
+    end
 
     local SafeCFrame = FindSafeTeleportCFrame(Target, Key)
-    if not SafeCFrame then return false, T("tpFail") .. Key end
+    if not SafeCFrame then
+        return false, T("tpFail") .. Key
+    end
 
-    local OldAutoRotate = Humanoid.AutoRotate
+    local oldAutoRotate = Humanoid.AutoRotate
     Humanoid.AutoRotate = false
+
     Root.AssemblyLinearVelocity = Vector3.zero
     Root.AssemblyAngularVelocity = Vector3.zero
+
+    -- PivotTo is used instead of setting only CFrame so the entire character
+    -- moves together.
     Character:PivotTo(SafeCFrame)
-    task.wait(0.05)
+
+    task.wait()
+
     if Root.Parent then
         Root.AssemblyLinearVelocity = Vector3.zero
         Root.AssemblyAngularVelocity = Vector3.zero
-        Character:PivotTo(SafeCFrame)
     end
-    task.delay(0.2, function()
-        if Humanoid.Parent then Humanoid.AutoRotate = OldAutoRotate end
+
+    task.delay(0.15, function()
+        if Humanoid.Parent then
+            Humanoid.AutoRotate = oldAutoRotate
+        end
     end)
+
     return true, T("tpOk") .. Key
 end
 
