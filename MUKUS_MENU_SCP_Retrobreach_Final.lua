@@ -390,18 +390,6 @@ Close.AutoButtonColor = false
 Close.Parent = TopBar
 AddCorner(Close, 8)
 
-local HideButton = Instance.new("TextButton")
-HideButton.Size = UDim2.fromOffset(35, 35)
-HideButton.Position = UDim2.new(1, -86, 0, 19)
-HideButton.BackgroundColor3 = Colors.Button
-HideButton.Text = "—"
-HideButton.TextColor3 = Colors.Text
-HideButton.Font = Enum.Font.GothamBold
-HideButton.TextSize = 18
-HideButton.AutoButtonColor = false
-HideButton.Parent = TopBar
-AddCorner(HideButton, 8)
-
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -30, 0, 32)
 TabBar.Position = UDim2.fromOffset(15, 75)
@@ -587,46 +575,8 @@ local function SetMenuState(Open)
     end
 end
 
-local Reopen = Instance.new("TextButton")
-Reopen.Name = "ReopenButton"
-Reopen.Size = UDim2.fromOffset(52, 52)
-Reopen.Position = UDim2.new(0, 18, 0.5, -26)
-Reopen.BackgroundColor3 = Colors.Panel
-Reopen.Text = "M"
-Reopen.TextColor3 = Colors.RedBright
-Reopen.Font = Enum.Font.GothamBlack
-Reopen.TextSize = 22
-Reopen.AutoButtonColor = false
-Reopen.Visible = false
-Reopen.Parent = ScreenGui
-AddCorner(Reopen, 14)
-AddStroke(Reopen, Colors.RedBright, 1, 0.15)
-
-local function HideMenu()
+Close.MouseButton1Click:Connect(function()
     SetMenuState(false)
-    Reopen.Visible = true
-end
-
-local function ShowMenu()
-    Reopen.Visible = false
-    SetMenuState(true)
-end
-
-HideButton.MouseButton1Click:Connect(HideMenu)
-
-Reopen.MouseButton1Click:Connect(ShowMenu)
-Close.MouseButton1Click:Connect(HideMenu)
-
--- RightShift toggles the panel without closing the script.
-UserInputService.InputBegan:Connect(function(Input, GameProcessed)
-    if GameProcessed then return end
-    if Input.KeyCode == Enum.KeyCode.RightShift then
-        if Main.Visible then
-            HideMenu()
-        else
-            ShowMenu()
-        end
-    end
 end)
 
 --==================================================
@@ -896,116 +846,114 @@ local function SetFullbright(Value)
 end
 
 --==================================================
+-- TELEPORT SYSTEM
 --==================================================
--- TELEPORT SYSTEM (DIRECT LANDMARK TP)
---==================================================
--- This version intentionally uses a simple, deterministic TP:
--- find the named landmark and move the character to a fixed
--- offset relative to that landmark. No raycast/safe-position
--- search is used.
 
 local TeleportAliases = {
-    ["914"] = {"scp914", "scp-914", "room914", "914room", "refiner", "914"},
-    ["armory"] = {"ezarmory", "entrancearmory", "securityarmory", "armory", "armoury", "weaponroom", "weapons", "gunroom"},
-    ["medkit"] = {"medkit", "medkits", "medkitspawn", "firstaid", "medicalkit", "healthkit", "bandage", "bandages"},
-    ["classd"] = {"classdcells", "dclasscells", "prisonercells", "classd", "dclass"},
-    ["035"] = {"scp035", "035chamber", "possessivemask", "mask", "035"},
-    ["escape"] = {"gateb", "gatebtopside", "gatebinbound", "surface", "escape", "extraction", "escapezone", "exit"}
+    ["914"] = {"scp914","scp-914","914","refiner","refinery"},
+    ["classd"] = {"classdcells","class-dcells","classdcells","dclasscells","d-classcells","dclass","class-d","prisonercells","prisonercell","cdcells","cellblock","cellblocks"},
+    ["armory"] = {"armory","armoury","weaponroom","weaponsroom","gunroom","guns","securityarmory","ezarmory","entrancearmory"},
+    ["medkit"] = {"medkit","medkits","medkitspawn","firstaid","firstaidkit","medicalkit","healthkit","bandage","bandages","medic","medical"},
+    ["035"] = {"scp035","scp-035","035","035chamber","mask","possessivemask"},
+    ["escape"] = {"gateb","gate-b","gatebdoor","gatebexit","surface","extraction","extract","escape","escapezone","surfaceexit","exit"}
 }
 
-local TeleportZoneHints = {
-    ["914"] = {"lcz", "lightcontainment", "lightcontainmentzone"},
-    ["classd"] = {"lcz", "lightcontainment", "classd", "prisoner"},
-    ["armory"] = {"ez", "entrance", "entrancezone", "security"},
-    ["035"] = {"hcz", "heavycontainment", "heavycontainmentzone"},
-    ["escape"] = {"gateb", "surface", "ez", "entrance", "entrancezone"},
-    ["medkit"] = {"medical", "med", "lcz", "ez"}
+local TeleportHints = {
+    ["914"] = {"lcz","lightcontainment","light containment","914"},
+    ["classd"] = {"lcz","lightcontainment","classd","class-d","cells","prisoner"},
+    ["armory"] = {"ez","entrance","entrancezone","security","armory"},
+    ["medkit"] = {"med","medical","firstaid","health"},
+    ["035"] = {"hcz","heavycontainment","035"},
+    ["escape"] = {"ez","entrance","gateb","surface","extraction"}
 }
 
--- Fixed offsets from the selected landmark.
--- Change only these numbers if a specific room in a game update
--- needs a different standing position.
-local TeleportOffsets = {
-    ["914"]   = CFrame.new(0, 3, -10),
-    ["classd"] = CFrame.new(0, 3, -8),
-    ["armory"] = CFrame.new(0, 3, -8),
-    ["medkit"] = CFrame.new(0, 3, -5),
-    ["035"]   = CFrame.new(0, 3, -8),
-    ["escape"] = CFrame.new(0, 3, -10)
-}
-
-local function NormalizeName(Text)
-    return tostring(Text):lower():gsub("[^%w]", "")
+local function TPNormalize(s)
+    return tostring(s or ""):lower():gsub("[^%w]+", "")
 end
 
-local function GetObjectPathName(Object)
-    local parts = {}
-    local current = Object
-    for _ = 1, 16 do
-        if not current then break end
-        table.insert(parts, NormalizeName(current.Name))
-        current = current.Parent
+local function TPPath(obj)
+    local p = {}
+    local cur = obj
+    for _ = 1, 10 do
+        if not cur then break end
+        table.insert(p, TPNormalize(cur.Name))
+        cur = cur.Parent
     end
-    return table.concat(parts, " ")
+    return table.concat(p, "/")
 end
 
-local function GetWorldCFrame(Object)
-    if not Object then return nil end
-    if Object:IsA("Attachment") then
-        return Object.WorldCFrame
-    elseif Object:IsA("BasePart") then
-        return Object.CFrame
-    elseif Object:IsA("Model") then
-        local ok, cf = pcall(function() return Object:GetPivot() end)
-        return ok and cf or nil
+local function TPPosition(obj)
+    if obj:IsA("Attachment") then return obj.WorldPosition end
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then return obj:GetPivot().Position end
+    if obj:IsA("Tool") then
+        local h = obj:FindFirstChild("Handle", true)
+        if h and h:IsA("BasePart") then return h.Position end
+        return obj:GetPivot().Position
     end
     return nil
 end
 
-local function MatchAlias(Name, Alias)
-    local n = NormalizeName(Name)
-    local a = NormalizeName(Alias)
-    if n == a then return 100 end
-    if #a >= 4 and string.find(n, a, 1, true) then return 60 end
-    if #n >= 4 and string.find(a, n, 1, true) then return 35 end
-    return 0
+local function TPModel(obj)
+    if obj:IsA("Model") then return obj end
+    return obj:FindFirstAncestorOfClass("Model")
 end
 
+-- The game map is procedural/beta, so hard-coded world coordinates are unreliable.
+-- This resolver finds the actual landmark currently spawned in Workspace, then TP's
+-- directly to that landmark (or its nearest doorway/entrance part).
 local function FindTeleportTarget(Key)
     local aliases = TeleportAliases[Key]
     if not aliases then return nil end
 
-    local hints = TeleportZoneHints[Key] or {}
+    local aliasSet, aliasWords = {}, {}
+    for _, a in ipairs(aliases) do
+        local n = TPNormalize(a)
+        aliasSet[n] = true
+        table.insert(aliasWords, n)
+    end
+
+    local hints = TeleportHints[Key] or {}
     local best, bestScore = nil, -math.huge
 
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("Attachment") then
-            local score = 0
+        if obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("Attachment") or obj:IsA("Tool") then
+            local name = TPNormalize(obj.Name)
+            if name ~= "" then
+                local score = nil
 
-            for _, alias in ipairs(aliases) do
-                score = math.max(score, MatchAlias(obj.Name, alias))
-            end
-
-            if score > 0 then
-                local path = GetObjectPathName(obj)
-
-                for _, hint in ipairs(hints) do
-                    local h = NormalizeName(hint)
-                    if h ~= "" and string.find(path, h, 1, true) then
-                        score += 90
+                -- Exact name is strongest.
+                if aliasSet[name] then
+                    score = 10000
+                else
+                    -- Partial/contains matching for different map naming conventions.
+                    for _, a in ipairs(aliasWords) do
+                        if #a >= 4 and (string.find(name, a, 1, true) or string.find(a, name, 1, true)) then
+                            local s = 7000 - math.abs(#name - #a) * 4
+                            if not score or s > score then score = s end
+                        end
                     end
                 end
 
-                -- Prefer actual room/model landmarks over tiny decorative parts.
-                if obj:IsA("Model") then
-                    score += 25
-                elseif obj:IsA("BasePart") then
-                    score += 5
-                end
+                if score then
+                    local path = TPPath(obj)
+                    for _, h in ipairs(hints) do
+                        local hn = TPNormalize(h)
+                        if hn ~= "" and string.find(path, hn, 1, true) then
+                            score += 1200
+                        end
+                    end
 
-                if score > bestScore then
-                    best = obj
-                    bestScore = score
+                    -- Prefer actual room models over tiny decorative parts.
+                    if obj:IsA("Model") then score += 250 end
+                    if obj:IsA("Tool") then score += 100 end
+
+                    local pos = TPPosition(obj)
+                    if pos and pos.Y > workspace.FallenPartsDestroyHeight + 10 then
+                        if score > bestScore then
+                            best, bestScore = obj, score
+                        end
+                    end
                 end
             end
         end
@@ -1014,50 +962,89 @@ local function FindTeleportTarget(Key)
     return best
 end
 
-local function TeleportTo(Key)
-    local Character = LocalPlayer.Character
-    local Root = Character and Character:FindFirstChild("HumanoidRootPart")
-    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+local function FindTeleportAnchor(target, key)
+    local root = TPModel(target)
+    if not root then return target end
 
-    if not Character or not Root or not Humanoid then
-        return false, T("tpFail") .. Key
+    local wanted = {
+        "entrance","entry","door","doora","doorb","gate","exit","hallway",
+        "corridor","floor","spawn","cells","cell","chamber","room"
+    }
+
+    local best, bestScore = nil, -math.huge
+    local targetPos = TPPosition(target) or root:GetPivot().Position
+
+    for _, obj in ipairs(root:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Attachment") then
+            local n = TPNormalize(obj.Name)
+            local score = 0
+
+            for i, w in ipairs(wanted) do
+                if string.find(n, w, 1, true) then
+                    score += 300 - i
+                end
+            end
+
+            local pos = TPPosition(obj)
+            if pos then
+                local d = (pos - targetPos).Magnitude
+                score -= math.min(d, 100) * 0.5
+                if obj:IsA("BasePart") and obj.CanCollide then score += 20 end
+            end
+
+            if score > bestScore then
+                best, bestScore = obj, score
+            end
+        end
     end
 
-    local Target = FindTeleportTarget(Key)
-    if not Target then
-        return false, T("tpFail") .. Key .. " • " .. T("hidden")
-    end
-
-    local TargetCF = GetWorldCFrame(Target)
-    local Offset = TeleportOffsets[Key] or CFrame.new(0, 3, -8)
-
-    if not TargetCF then
-        return false, T("tpFail") .. Key
-    end
-
-    local Destination = TargetCF * Offset
-
-    -- Direct TP: no raycasts, no "safe" candidate selection and no
-    -- random search. The destination is always the same relative
-    -- position for the selected landmark.
-    local oldAutoRotate = Humanoid.AutoRotate
-    Humanoid.AutoRotate = false
-
-    Root.AssemblyLinearVelocity = Vector3.zero
-    Root.AssemblyAngularVelocity = Vector3.zero
-    Character:PivotTo(Destination)
-
-    task.wait(0.05)
-
-    if Root.Parent then
-        Root.AssemblyLinearVelocity = Vector3.zero
-        Root.AssemblyAngularVelocity = Vector3.zero
-    end
-
-    Humanoid.AutoRotate = oldAutoRotate
-    return true, T("tpOk") .. Key
+    return best or target
 end
 
+local function TeleportTo(Key)
+    local target = FindTeleportTarget(Key)
+    if not target then
+        return false, T("tpFail") .. Key
+    end
+
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not character or not root or not humanoid then
+        return false, T("tpFail") .. Key
+    end
+
+    local anchor = FindTeleportAnchor(target, Key)
+    local pos = TPPosition(anchor) or TPPosition(target)
+    if not pos then
+        return false, T("tpFail") .. Key
+    end
+
+    -- Direct landmark TP. No random safe-point search and no map-wide coordinates.
+    -- Offset is small so the player arrives at the landmark rather than far away.
+    local destination = pos + Vector3.new(0, 3.5, 0)
+
+    local oldRotate = humanoid.AutoRotate
+    humanoid.AutoRotate = false
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+
+    character:PivotTo(CFrame.new(destination))
+
+    task.wait()
+    if root.Parent then
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end
+
+    task.delay(0.15, function()
+        if humanoid.Parent then humanoid.AutoRotate = oldRotate end
+    end)
+
+    return true, T("tpOk") .. " " .. Key
+end
+
+--==================================================
 -- SPEED CONTROL
 --==================================================
 
