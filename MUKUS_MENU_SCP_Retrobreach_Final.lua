@@ -390,6 +390,18 @@ Close.AutoButtonColor = false
 Close.Parent = TopBar
 AddCorner(Close, 8)
 
+local HideButton = Instance.new("TextButton")
+HideButton.Size = UDim2.fromOffset(35, 35)
+HideButton.Position = UDim2.new(1, -86, 0, 19)
+HideButton.BackgroundColor3 = Colors.Button
+HideButton.Text = "—"
+HideButton.TextColor3 = Colors.Text
+HideButton.Font = Enum.Font.GothamBold
+HideButton.TextSize = 18
+HideButton.AutoButtonColor = false
+HideButton.Parent = TopBar
+AddCorner(HideButton, 8)
+
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -30, 0, 32)
 TabBar.Position = UDim2.fromOffset(15, 75)
@@ -575,8 +587,46 @@ local function SetMenuState(Open)
     end
 end
 
-Close.MouseButton1Click:Connect(function()
+local Reopen = Instance.new("TextButton")
+Reopen.Name = "ReopenButton"
+Reopen.Size = UDim2.fromOffset(52, 52)
+Reopen.Position = UDim2.new(0, 18, 0.5, -26)
+Reopen.BackgroundColor3 = Colors.Panel
+Reopen.Text = "M"
+Reopen.TextColor3 = Colors.RedBright
+Reopen.Font = Enum.Font.GothamBlack
+Reopen.TextSize = 22
+Reopen.AutoButtonColor = false
+Reopen.Visible = false
+Reopen.Parent = ScreenGui
+AddCorner(Reopen, 14)
+AddStroke(Reopen, Colors.RedBright, 1, 0.15)
+
+local function HideMenu()
     SetMenuState(false)
+    Reopen.Visible = true
+end
+
+local function ShowMenu()
+    Reopen.Visible = false
+    SetMenuState(true)
+end
+
+HideButton.MouseButton1Click:Connect(HideMenu)
+
+Reopen.MouseButton1Click:Connect(ShowMenu)
+Close.MouseButton1Click:Connect(HideMenu)
+
+-- RightShift toggles the panel without closing the script.
+UserInputService.InputBegan:Connect(function(Input, GameProcessed)
+    if GameProcessed then return end
+    if Input.KeyCode == Enum.KeyCode.RightShift then
+        if Main.Visible then
+            HideMenu()
+        else
+            ShowMenu()
+        end
+    end
 end)
 
 --==================================================
@@ -846,14 +896,19 @@ local function SetFullbright(Value)
 end
 
 --==================================================
--- TELEPORT SYSTEM (ROBUST / SAFE)
 --==================================================
+-- TELEPORT SYSTEM (DIRECT LANDMARK TP)
+--==================================================
+-- This version intentionally uses a simple, deterministic TP:
+-- find the named landmark and move the character to a fixed
+-- offset relative to that landmark. No raycast/safe-position
+-- search is used.
 
 local TeleportAliases = {
     ["914"] = {"scp914", "scp-914", "room914", "914room", "refiner", "914"},
     ["armory"] = {"ezarmory", "entrancearmory", "securityarmory", "armory", "armoury", "weaponroom", "weapons", "gunroom"},
     ["medkit"] = {"medkit", "medkits", "medkitspawn", "firstaid", "medicalkit", "healthkit", "bandage", "bandages"},
-    ["classd"] = {"classdcells", "classdcells", "dclasscells", "prisonercells", "classd", "dclass"},
+    ["classd"] = {"classdcells", "dclasscells", "prisonercells", "classd", "dclass"},
     ["035"] = {"scp035", "035chamber", "possessivemask", "mask", "035"},
     ["escape"] = {"gateb", "gatebtopside", "gatebinbound", "surface", "escape", "extraction", "escapezone", "exit"}
 }
@@ -867,13 +922,16 @@ local TeleportZoneHints = {
     ["medkit"] = {"medical", "med", "lcz", "ez"}
 }
 
-local TeleportProfiles = {
-    ["914"]   = {anchors = {"entrance", "door", "exit", "hallway", "floor", "scp914entrance"}, radius = 16},
-    ["classd"] = {anchors = {"cellsentrance", "cellentrance", "door", "hallway", "floor", "spawn"}, radius = 18},
-    ["armory"] = {anchors = {"entrance", "door", "lobby", "hall", "floor"}, radius = 16},
-    ["medkit"] = {anchors = {"medicalbay", "medical", "firstaid", "floor", "entrance"}, radius = 12},
-    ["035"] = {anchors = {"observation", "controlroom", "entrance", "door", "floor", "chamber"}, radius = 16},
-    ["escape"] = {anchors = {"gate", "entrance", "exit", "surface", "floor", "elevator"}, radius = 22}
+-- Fixed offsets from the selected landmark.
+-- Change only these numbers if a specific room in a game update
+-- needs a different standing position.
+local TeleportOffsets = {
+    ["914"]   = CFrame.new(0, 3, -10),
+    ["classd"] = CFrame.new(0, 3, -8),
+    ["armory"] = CFrame.new(0, 3, -8),
+    ["medkit"] = CFrame.new(0, 3, -5),
+    ["035"]   = CFrame.new(0, 3, -8),
+    ["escape"] = CFrame.new(0, 3, -10)
 }
 
 local function NormalizeName(Text)
@@ -883,7 +941,7 @@ end
 local function GetObjectPathName(Object)
     local parts = {}
     local current = Object
-    for _ = 1, 12 do
+    for _ = 1, 16 do
         if not current then break end
         table.insert(parts, NormalizeName(current.Name))
         current = current.Parent
@@ -891,227 +949,63 @@ local function GetObjectPathName(Object)
     return table.concat(parts, " ")
 end
 
-local function GetWorldPosition(Object)
+local function GetWorldCFrame(Object)
     if not Object then return nil end
     if Object:IsA("Attachment") then
-        return Object.WorldPosition
+        return Object.WorldCFrame
     elseif Object:IsA("BasePart") then
-        return Object.Position
+        return Object.CFrame
     elseif Object:IsA("Model") then
         local ok, cf = pcall(function() return Object:GetPivot() end)
-        return ok and cf.Position or nil
+        return ok and cf or nil
     end
     return nil
 end
 
-local function GetBounds(Object)
-    if not Object then return nil, nil end
-    if Object:IsA("Model") then
-        local ok, cf, size = pcall(function() return Object:GetBoundingBox() end)
-        if ok then return cf, size end
-    elseif Object:IsA("BasePart") then
-        return Object.CFrame, Object.Size
-    end
-    local pos = GetWorldPosition(Object)
-    return pos and CFrame.new(pos) or nil, Vector3.new(4, 4, 4)
-end
-
-local function NameMatches(normalizedName, alias)
-    local a = NormalizeName(alias)
-    if normalizedName == a then
-        return 100
-    end
-    if #a >= 4 and string.find(normalizedName, a, 1, true) then
-        return 55
-    end
+local function MatchAlias(Name, Alias)
+    local n = NormalizeName(Name)
+    local a = NormalizeName(Alias)
+    if n == a then return 100 end
+    if #a >= 4 and string.find(n, a, 1, true) then return 60 end
+    if #n >= 4 and string.find(a, n, 1, true) then return 35 end
     return 0
 end
 
 local function FindTeleportTarget(Key)
-    local Aliases = TeleportAliases[Key]
-    if not Aliases then return nil end
+    local aliases = TeleportAliases[Key]
+    if not aliases then return nil end
 
-    local Hints = TeleportZoneHints[Key] or {}
-    local Best, BestScore = nil, -math.huge
+    local hints = TeleportZoneHints[Key] or {}
+    local best, bestScore = nil, -math.huge
 
-    for _, Object in ipairs(workspace:GetDescendants()) do
-        if Object:IsA("BasePart") or Object:IsA("Model") or Object:IsA("Attachment") then
-            local normalized = NormalizeName(Object.Name)
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") or obj:IsA("BasePart") or obj:IsA("Attachment") then
             local score = 0
 
-            for index, alias in ipairs(Aliases) do
-                local matchScore = NameMatches(normalized, alias)
-                if matchScore > 0 then
-                    score = math.max(score, matchScore + math.max(0, 30 - index))
-                end
+            for _, alias in ipairs(aliases) do
+                score = math.max(score, MatchAlias(obj.Name, alias))
             end
 
             if score > 0 then
-                local path = GetObjectPathName(Object)
+                local path = GetObjectPathName(obj)
 
-                for _, hint in ipairs(Hints) do
+                for _, hint in ipairs(hints) do
                     local h = NormalizeName(hint)
-                    if #h >= 3 and string.find(path, h, 1, true) then
-                        score += 80
+                    if h ~= "" and string.find(path, h, 1, true) then
+                        score += 90
                     end
                 end
 
-                -- Prefer a model/room container over a tiny decorative part.
-                if Object:IsA("Model") then
-                    score += 18
-                elseif Object:IsA("Attachment") then
-                    score += 8
+                -- Prefer actual room/model landmarks over tiny decorative parts.
+                if obj:IsA("Model") then
+                    score += 25
+                elseif obj:IsA("BasePart") then
+                    score += 5
                 end
 
-                local _, size = GetBounds(Object)
-                if size then
-                    -- Very tiny parts are usually props, not destinations.
-                    if size.X >= 2 and size.Z >= 2 then score += 5 end
-                end
-
-                if score > BestScore then
-                    Best = Object
-                    BestScore = score
-                end
-            end
-        end
-    end
-
-    return Best
-end
-
-local function FindPreferredAnchor(Target, Key)
-    local Profile = TeleportProfiles[Key]
-    if not Profile then return Target end
-
-    local TargetPos = GetWorldPosition(Target)
-    if not TargetPos then return Target end
-
-    local best, bestScore = nil, -math.huge
-    local current = Target
-
-    -- Search several ancestor containers. The previous version only searched
-    -- one model level, which often made SCP-914/Armory resolve to a wall part.
-    for _ = 1, 6 do
-        if not current then break end
-
-        for _, obj in ipairs(current:GetDescendants()) do
-            if obj:IsA("BasePart") or obj:IsA("Attachment") then
-                local n = NormalizeName(obj.Name)
-                for index, wanted in ipairs(Profile.anchors) do
-                    local w = NormalizeName(wanted)
-                    if n == w or (#w >= 4 and string.find(n, w, 1, true)) then
-                        local pos = GetWorldPosition(obj)
-                        if pos then
-                            local distance = (pos - TargetPos).Magnitude
-                            local score = 200 - index * 10 - distance
-                            if score > bestScore then
-                                best = obj
-                                bestScore = score
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        current = current.Parent
-    end
-
-    return best or Target
-end
-
-local function IsSpaceFree(CFramePosition, Overlap, Character)
-    local parts = workspace:GetPartBoundsInBox(
-        CFrame.new(CFramePosition),
-        Vector3.new(4.5, 6.2, 4.5),
-        Overlap
-    )
-
-    for _, part in ipairs(parts) do
-        if part.CanCollide and part.Transparency < 0.98 and not part:IsDescendantOf(Character) then
-            return false
-        end
-    end
-
-    return true
-end
-
-local function FindSafeTeleportCFrame(Target, Key)
-    local Character = LocalPlayer.Character
-    if not Character then return nil end
-
-    local Anchor = FindPreferredAnchor(Target, Key)
-    local AnchorCF, AnchorSize = GetBounds(Anchor)
-    if not AnchorCF then return nil end
-
-    local Params = RaycastParams.new()
-    Params.FilterType = Enum.RaycastFilterType.Exclude
-    Params.FilterDescendantsInstances = {Character}
-
-    local Overlap = OverlapParams.new()
-    Overlap.FilterType = Enum.RaycastFilterType.Exclude
-    Overlap.FilterDescendantsInstances = {Character}
-
-    local Profile = TeleportProfiles[Key] or {radius = 14}
-    local center = AnchorCF.Position
-    local candidates = {}
-
-    -- Sample the outside of the actual landmark bounds first.
-    local halfX = math.max(3, AnchorSize.X * 0.5 + 3.5)
-    local halfZ = math.max(3, AnchorSize.Z * 0.5 + 3.5)
-
-    local offsets = {
-        Vector3.new(halfX, 14, 0),
-        Vector3.new(-halfX, 14, 0),
-        Vector3.new(0, 14, halfZ),
-        Vector3.new(0, 14, -halfZ),
-        Vector3.new(halfX, 14, halfZ),
-        Vector3.new(-halfX, 14, halfZ),
-        Vector3.new(halfX, 14, -halfZ),
-        Vector3.new(-halfX, 14, -halfZ)
-    }
-
-    for _, offset in ipairs(offsets) do
-        table.insert(candidates, AnchorCF:PointToWorldSpace(offset))
-    end
-
-    -- Fallback ring around the landmark.
-    for radius = 5, Profile.radius, 3 do
-        for i = 0, 15 do
-            local angle = math.rad(i * 22.5)
-            table.insert(candidates, center + Vector3.new(
-                math.cos(angle) * radius,
-                16,
-                math.sin(angle) * radius
-            ))
-        end
-    end
-
-    local best, bestScore = nil, math.huge
-
-    for _, probe in ipairs(candidates) do
-        local down = workspace:Raycast(probe, Vector3.new(0, -80, 0), Params)
-
-        if down and down.Position.Y > workspace.FallenPartsDestroyHeight + 25 and down.Normal.Y >= 0.75 then
-            local position = down.Position + Vector3.new(0, 3.25, 0)
-
-            if IsSpaceFree(position, Overlap, Character) then
-                local distance = (position - center).Magnitude
-
-                -- Keep the TP close to the selected landmark.
-                if distance <= Profile.radius + math.max(AnchorSize.X, AnchorSize.Z) + 6 then
-                    local score = distance
-
-                    -- Prefer the actual floor immediately outside the target.
-                    if down.Instance:IsDescendantOf(Target) then
-                        score -= 4
-                    end
-
-                    if score < bestScore then
-                        best = CFrame.new(position)
-                        bestScore = score
-                    end
+                if score > bestScore then
+                    best = obj
+                    bestScore = score
                 end
             end
         end
@@ -1134,38 +1028,36 @@ local function TeleportTo(Key)
         return false, T("tpFail") .. Key .. " • " .. T("hidden")
     end
 
-    local SafeCFrame = FindSafeTeleportCFrame(Target, Key)
-    if not SafeCFrame then
+    local TargetCF = GetWorldCFrame(Target)
+    local Offset = TeleportOffsets[Key] or CFrame.new(0, 3, -8)
+
+    if not TargetCF then
         return false, T("tpFail") .. Key
     end
 
+    local Destination = TargetCF * Offset
+
+    -- Direct TP: no raycasts, no "safe" candidate selection and no
+    -- random search. The destination is always the same relative
+    -- position for the selected landmark.
     local oldAutoRotate = Humanoid.AutoRotate
     Humanoid.AutoRotate = false
 
     Root.AssemblyLinearVelocity = Vector3.zero
     Root.AssemblyAngularVelocity = Vector3.zero
+    Character:PivotTo(Destination)
 
-    -- PivotTo is used instead of setting only CFrame so the entire character
-    -- moves together.
-    Character:PivotTo(SafeCFrame)
-
-    task.wait()
+    task.wait(0.05)
 
     if Root.Parent then
         Root.AssemblyLinearVelocity = Vector3.zero
         Root.AssemblyAngularVelocity = Vector3.zero
     end
 
-    task.delay(0.15, function()
-        if Humanoid.Parent then
-            Humanoid.AutoRotate = oldAutoRotate
-        end
-    end)
-
+    Humanoid.AutoRotate = oldAutoRotate
     return true, T("tpOk") .. Key
 end
 
---==================================================
 -- SPEED CONTROL
 --==================================================
 
